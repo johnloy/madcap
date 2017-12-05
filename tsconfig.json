@@ -1,0 +1,18 @@
+{
+  "compileOnSave": true,
+  "compilerOptions": {
+    "baseUrl": "./src",
+    "jsx": "react",
+    "lib": [ "es2015", "dom" ],
+    "module": "commonjs",
+    "noImplicitAny": true,
+    "outDir": "./lib",
+    "sourceMap": true,
+    "strictNullChecks": true,
+    "target": "es5",
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+      "src/**/*"
+  ]
+}
