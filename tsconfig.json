@@ -10,7 +10,8 @@
     "sourceMap": true,
     "strictNullChecks": true,
     "target": "es5",
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true
   },
   "include": [
       "src/**/*"
