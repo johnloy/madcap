@@ -28,13 +28,15 @@ window.__DEBUG__ = __DEVELOPMENT__ || __QA__;
 const attempt = Madcap.core.attempt;
 
 function doSomethingAsync(attempt) {
-  // throw new Error('in sync function returning an attempt promise back to a parent attempt');
+  // throw new Error(
+  //   'in sync function returning an attempt promise back to a parent attempt'
+  // );
   // 2) called doSomethingAsync()
   const firstAttempt = attempt('something async', attempt => {
     // throw new Error('in attempt callback, before returning another attempt'); // 2.
     // 5) return Promise with an async operation
     return attempt('wait', () => {
-      // throw new Error('in nested attempt callback') // 3.
+      throw new Error('in nested attempt callback'); // 3.
 
       return new Promise((resolve, reject) => {
         // done
@@ -58,7 +60,8 @@ function doSomethingAsync(attempt) {
   });
 
   const secondAttempt = attempt('sibling attempt', () => {
-    throw new Error('in sibling attempt');
+    // throw new Error('in sibling attempt');
+    return true;
   });
 
   return Promise.all([firstAttempt, secondAttempt]);
@@ -71,8 +74,8 @@ function bootstrap(attempt) {
 
   //   throw new Error(`in function before first attempt`); // 1.
 
-  return attempt('bootstrap', attempt => {
-    throw new Error('in root attempt callback function');
+  return attempt('bootstrap', async attempt => {
+    // throw new Error('in root attempt callback function');
     return doSomethingAsync(attempt)
       .then(
         () => {
@@ -96,7 +99,7 @@ function someUserAction() {
   });
 }
 
-throw new Error('before bootstrap');
+// throw new Error('before bootstrap');
 
 attempt('init', bootstrap);
 

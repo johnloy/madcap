@@ -1,0 +1,40 @@
+Arguments: 
+  /Users/johnloy/.nvm/versions/node/v8.2.1/bin/node /usr/local/Cellar/yarn/1.3.2/libexec/bin/yarn.js link madcap
+
+PATH: 
+  /Users/johnloy/.rbenv/shims:/Users/johnloy/.nvm/versions/node/v8.2.1/bin:/Users/johnloy/node/n/bin:/Users/johnloy/node/global/bin:/Users/johnloy/.plenv/bin:/Users/johnloy/perl5/bin:/Users/johnloy/bin/items:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/johnloy/.rbenv/shims:/Users/johnloy/.plenv/shims:/Users/johnloy/node/n/bin:/Users/johnloy/node/global/bin:/Users/johnloy/.plenv/bin:/Users/johnloy/perl5/bin:/Users/johnloy/bin/items
+
+Yarn version: 
+  1.3.2
+
+Node version: 
+  8.2.1
+
+Platform: 
+  darwin x64
+
+npm manifest: 
+  {
+    "name": "promises",
+    "version": "1.0.0",
+    "main": "index.js",
+    "license": "MIT"
+    "dependencies": {
+      "madcap": ">0"
+    }
+  }
+
+yarn manifest: 
+  No manifest
+
+Lockfile: 
+  No lockfile
+
+Trace: 
+  SyntaxError: /Users/johnloy/src/items/github.com/johnloy/madcap/examples/promises/package.json: Unexpected string in JSON at position 89
+      at JSON.parse (<anonymous>)
+      at /usr/local/Cellar/yarn/1.3.2/libexec/lib/cli.js:770:59
+      at Generator.next (<anonymous>)
+      at step (/usr/local/Cellar/yarn/1.3.2/libexec/lib/cli.js:92:30)
+      at /usr/local/Cellar/yarn/1.3.2/libexec/lib/cli.js:103:13
+      at <anonymous>

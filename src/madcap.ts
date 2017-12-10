@@ -98,7 +98,12 @@ function prepareError(
   }
 
   error.message = msg;
-  error.stack = stackFrames && stackFrames.map(f => f.source).join('\n');
+  error.stack =
+    stackFrames &&
+    stackFrames
+      .filter(l => l.source)
+      .map(f => f.source)
+      .join('\n');
   error.fileName = topFrame.fileName;
   error.lineNumber = topFrame.lineNumber;
   error.columnNumber = topFrame.columnNumber;
@@ -135,11 +140,8 @@ export async function attempt(
   pastAttempts?: Attempt[]
 ): Promise<any> {
   const stackFrames = await StackTrace.fromError(new Error(), {
-    offline: true,
     filter: cleanAttemptStack
   });
-
-  console.log('wut');
 
   let attempts = pastAttempts || attemptsMap.get(fn);
 
@@ -149,8 +151,7 @@ export async function attempt(
     const ret = attempt(name, fn).catch(async (error: MadcapError) => {
       if (!error.trace) {
         error.trace = await StackTrace.fromError(error, {
-          offline: true,
-          filter: cleanStack
+          // filter: cleanStack
         });
         const newStackFrames = attempts
           .reverse()
@@ -200,7 +201,7 @@ function isMadcapError(error: Error): error is MadcapError {
 
 window.onerror = (msg, url, line, col, error) => {
   if (error && !isMadcapError(error)) {
-    StackTrace.fromError(error, { offline: true, filter: cleanStack }).then(
+    StackTrace.fromError(error, { filter: cleanStack }).then(
       prepareError.bind(null, error)
     );
   }
@@ -214,7 +215,7 @@ window.addEventListener('unhandledrejection', (e: PromiseRejectionEvent) => {
   if (error.trace) {
     prepareError(error, error.trace);
   } else {
-    StackTrace.fromError(error, { offline: true, filter: cleanStack }).then(
+    StackTrace.fromError(error, { filter: cleanStack }).then(
       prepareError.bind(null, error)
     );
   }

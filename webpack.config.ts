@@ -19,20 +19,32 @@ const paths = {
   DIST: path.join(__dirname, 'dist')
 };
 
-const baseConfig = {
-  // devtool: 'source-map',
+const baseConfig: Partial<webpack.Configuration> = {
+  devtool: 'source-map',
 
   module: {
     rules: [
       {
         test: /\.tsx?$/,
-        use: 'ts-loader',
+        use: {
+          loader: 'ts-loader',
+          options: {
+            compilerOptions: {
+              target: 'es5'
+            }
+          }
+        },
         exclude: /node_modules/
       }
     ]
   },
 
-  // plugins: [new webpack.optimize.UglifyJsPlugin()],
+  plugins: [
+    new webpack.optimize.UglifyJsPlugin({
+      sourceMap: true,
+      include: /\.min\.js$/
+    })
+  ],
 
   resolve: {
     extensions: ['.ts', '.tsx', '.js', '.json']
@@ -69,28 +81,13 @@ const ENTRY_POINTS: IEntryPoints = {
   }
 };
 
-function buildEntryConfig(
-  mapping: webpack.Entry,
-  namespace: string,
-  env: any
-): webpack.Entry {
-  return Object.keys(mapping).reduce(
-    (entryPoints: webpack.Entry, filename: string): webpack.Entry =>
-      ({
-        ...entryPoints,
-        [filename + '.dist']: ENTRY_POINTS[namespace][filename]
-      } as webpack.Entry),
-    mapping
-  );
-}
-
 function buildOutputConfig(
   namespace: string | undefined,
   env: any
 ): webpack.Output {
   return {
     path: paths.DIST,
-    filename: 'madcap.[name].js',
+    filename: 'madcap.[name].' + (env.min ? 'min.' : '') + 'js',
     library: ['Madcap', namespace, '[name]'].filter(i => i) as string[],
     libraryTarget: 'umd'
   };
@@ -103,7 +100,7 @@ function buildConfig(
 ): webpack.Configuration {
   return {
     ...baseConfig,
-    entry: buildEntryConfig(entryPoints, namespace, env),
+    entry: entryPoints,
     output: buildOutputConfig(namespace === 'base' ? undefined : namespace, env)
   };
 }
@@ -112,7 +109,13 @@ const { base: baseEntryPoints, ...namespacedEntryPoints } = ENTRY_POINTS;
 
 const namespaces = Object.keys(namespacedEntryPoints);
 
-module.exports = (env: webpack.Configuration): webpack.Configuration[] => [
-  buildConfig(baseEntryPoints, 'base', env),
-  ...namespaces.map(ns => buildConfig(ENTRY_POINTS[ns], ns, env))
-];
+module.exports = (env: webpack.Configuration = {}): webpack.Configuration[] => {
+  return [
+    buildConfig(baseEntryPoints, 'base', env),
+    buildConfig(baseEntryPoints, 'base', { ...env, min: true }),
+    ...namespaces.map(ns => buildConfig(ENTRY_POINTS[ns], ns, env)),
+    ...namespaces.map(ns =>
+      buildConfig(ENTRY_POINTS[ns], ns, { ...env, min: true })
+    )
+  ];
+};
