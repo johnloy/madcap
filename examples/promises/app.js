@@ -25,7 +25,37 @@ window.__QA__ = false;
  */
 window.__DEBUG__ = __DEVELOPMENT__ || __QA__;
 
-const attempt = Madcap.core.attempt;
+const attempt = Madcap.attempt;
+
+/*
+Wrap every point of possible exception in a try catch. 
+When not in debug mode, attempt to recover.
+When in debug mode, fail noticeably.
+When in debug mode use window.onerror to block the UI.
+Always use window.onerror for logging.
+
+1. error in sync function executing function returning a promise
+handle with 
+handle with window.onerror
+
+2. error in sync function returning a promise
+handle with window.onerror
+
+3. error in the promise initializer
+failure callback
+
+4. error in failure callback for then
+.catch
+
+5. error in async function
+.onerror
+ideally failure callback for then
+
+error in promise then
+
+error in failure callback for the
+
+*/
 
 function doSomethingAsync(attempt) {
   // throw new Error(
@@ -98,6 +128,18 @@ function someUserAction() {
     throw new Error('something broke');
   });
 }
+
+// createStrategy(
+//   new Map([
+//     [FetchError],
+//     [
+//       AssetLoadError,
+//       error => {
+//         let foo;
+//       }
+//     ]
+//   ])
+// );
 
 // throw new Error('before bootstrap');
 
