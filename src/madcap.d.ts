@@ -77,3 +77,20 @@ export interface MadcapError extends Error {
   columnNumber: number;
   attemptsRoot: AttemptFunction;
 }
+
+export type StrategyMap = Map<Error, ErrorHandler> | [[Error, ErrorHandler]];
+
+export interface ErrorHandler {
+  (
+    error: Error,
+    stackframes?: StackTrace.StackFrame[],
+    attempts?: Attempt[]
+  ): void;
+}
+
+export interface Strategy extends ErrorHandler {
+  __default__?: ErrorHandler;
+  add?: (constr: Error, strategy: ErrorHandler) => void;
+  remove?: (constr: Error, strategy: ErrorHandler) => void;
+  setDefault?: (strategy: ErrorHandler) => ErrorHandler;
+}

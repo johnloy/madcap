@@ -7,9 +7,13 @@ import {
   BrowserApi,
   Config,
   CoreApi,
-  MadcapError
+  MadcapError,
+  Strategy,
+  ErrorHandler,
+  StrategyMap
 } from 'madcap.d';
 import * as StackTrace from 'stacktrace-js';
+import { StackFrame } from 'stacktrace-js';
 
 // export { default as createError } from './createError';
 
@@ -184,29 +188,61 @@ export function init(): CoreApi | Partial<CoreApi> {
     }
   }
 
-  // function retryThenRecover(error, retry, retryTimes, recover) {
-  //   if (error.retry && error.retriedCount) {
-  //   }
-  // }
+  function retryThenRecover(
+    error: Error | MadcapError /*, retry, retryTimes, recover*/
+  ) {
+    console.log(error);
+    // if (error.retry && error.retriedCount) {
+    // }
+  }
 
-  // function createStrategy(strategyMap) {
-  //   const strategyInstance = (error, stackFrames, attempts) => {
-  //     let strategy;
-  //     if (!strategyMap.has(error.constructor)) {
-  //       if (!strategyInstance.__default__) return;
-  //       strategy = strategyInstance.__default__;
-  //     } else {
-  //       strategy = strategyMap.get(error.constructor) || retryThenRecover;
-  //     }
-  //     strategy(error);
-  //   };
-  //   strategy.add = (constr, strategy) => strategyMap.set(constr, strategy);
-  //   strategy.remove = (constr, strategy) => strategyMap.delete(constr);
-  //   strategy.setDefault = strategy => (strategyInstance.__default__ = strategy);
-  // }
+  function createStrategy(strategyDef: StrategyMap): Strategy {
+    const strategyMap = new Map(strategyDef);
+    const strategy: Strategy = (
+      error: Error,
+      stackFrames: StackFrame[],
+      attempts: Attempt[]
+    ): void => {
+      let resolvedStrategy;
+      if (!strategyMap.has((error as any).constructor)) {
+        if (!strategy.__default__) return;
+        resolvedStrategy = strategy.__default__;
+      } else {
+        resolvedStrategy = strategyMap.get((error as any).constructor);
+      }
+      resolvedStrategy!(error);
+    };
 
-  const api = { attempt, configure };
-  Object.assign(api, { attempt, configure });
+    strategy.add = (constr: Error, handler: ErrorHandler) =>
+      strategyMap.set(constr, handler);
+    strategy.remove = (constr: Error, handler: ErrorHandler) =>
+      strategyMap.delete(constr);
+    strategy.setDefault = (handler: ErrorHandler): ErrorHandler => {
+      strategy.__default__ = handler;
+      return handler;
+    };
+
+    return strategy;
+  }
+
+  function createReportStrategy(strategyDef: StrategyMap): Strategy {
+    const strategy = createStrategy(strategyDef);
+    strategy.setDefault!(reportToConsole);
+    return strategy;
+  }
+
+  function createHandleStrategy(strategyDef: StrategyMap): Strategy {
+    const strategy = createStrategy(strategyDef);
+    strategy.setDefault!(retryThenRecover);
+    return strategy;
+  }
+
+  const api = {
+    attempt,
+    configure,
+    createReportStrategy,
+    createHandleStrategy
+  };
   if (typeof window !== 'undefined') {
     Object.assign(api, { cleanStack, prepareError, config });
   }

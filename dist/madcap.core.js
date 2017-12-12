@@ -1464,27 +1464,53 @@ function init() {
             });
         });
     }
-    // function retryThenRecover(error, retry, retryTimes, recover) {
-    //   if (error.retry && error.retriedCount) {
-    //   }
-    // }
-    // function createStrategy(strategyMap) {
-    //   const strategyInstance = (error, stackFrames, attempts) => {
-    //     let strategy;
-    //     if (!strategyMap.has(error.constructor)) {
-    //       if (!strategyInstance.__default__) return;
-    //       strategy = strategyInstance.__default__;
-    //     } else {
-    //       strategy = strategyMap.get(error.constructor) || retryThenRecover;
-    //     }
-    //     strategy(error);
-    //   };
-    //   strategy.add = (constr, strategy) => strategyMap.set(constr, strategy);
-    //   strategy.remove = (constr, strategy) => strategyMap.delete(constr);
-    //   strategy.setDefault = strategy => (strategyInstance.__default__ = strategy);
-    // }
-    var api = { attempt: attempt, configure: configure };
-    Object.assign(api, { attempt: attempt, configure: configure });
+    function retryThenRecover(error /*, retry, retryTimes, recover*/) {
+        console.log(error);
+        // if (error.retry && error.retriedCount) {
+        // }
+    }
+    function createStrategy(strategyDef) {
+        var strategyMap = new Map(strategyDef);
+        var strategy = function (error, stackFrames, attempts) {
+            var resolvedStrategy;
+            if (!strategyMap.has(error.constructor)) {
+                if (!strategy.__default__)
+                    return;
+                resolvedStrategy = strategy.__default__;
+            }
+            else {
+                resolvedStrategy = strategyMap.get(error.constructor);
+            }
+            resolvedStrategy(error);
+        };
+        strategy.add = function (constr, handler) {
+            return strategyMap.set(constr, handler);
+        };
+        strategy.remove = function (constr, handler) {
+            return strategyMap.delete(constr);
+        };
+        strategy.setDefault = function (handler) {
+            strategy.__default__ = handler;
+            return handler;
+        };
+        return strategy;
+    }
+    function createReportStrategy(strategyDef) {
+        var strategy = createStrategy(strategyDef);
+        strategy.setDefault(reportToConsole);
+        return strategy;
+    }
+    function createHandleStrategy(strategyDef) {
+        var strategy = createStrategy(strategyDef);
+        strategy.setDefault(retryThenRecover);
+        return strategy;
+    }
+    var api = {
+        attempt: attempt,
+        configure: configure,
+        createReportStrategy: createReportStrategy,
+        createHandleStrategy: createHandleStrategy
+    };
     if (typeof window !== 'undefined') {
         Object.assign(api, { cleanStack: cleanStack, prepareError: prepareError, config: config });
     }

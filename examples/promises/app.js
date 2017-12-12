@@ -25,7 +25,33 @@ window.__QA__ = false;
  */
 window.__DEBUG__ = __DEVELOPMENT__ || __QA__;
 
-const attempt = Madcap.attempt;
+Madcap.configure({
+  // report: Madcap.createReportStrategy([
+  //   [
+  //     Error,
+  //     error => {
+  //       console.error(error);
+  //     }
+  //   ]
+  //   // [
+  //   //   AssetLoadError,
+  //   //   error => {
+  //   //     let foo;
+  //   //   }
+  //   // ]
+  // ]),
+  // handle: Madcap.createHandleStrategy([
+  //   [
+  //     Error,
+  //     error => {
+  //       console.log('woops');
+  //       console.error(error);
+  //     }
+  //   ]
+  // ])
+});
+
+const { attempt } = Madcap;
 
 /*
 Wrap every point of possible exception in a try catch. 
@@ -128,18 +154,6 @@ function someUserAction() {
     throw new Error('something broke');
   });
 }
-
-// createStrategy(
-//   new Map([
-//     [FetchError],
-//     [
-//       AssetLoadError,
-//       error => {
-//         let foo;
-//       }
-//     ]
-//   ])
-// );
 
 // throw new Error('before bootstrap');
 
