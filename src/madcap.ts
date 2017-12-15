@@ -13,9 +13,7 @@ import {
   StrategyMap
 } from 'madcap.d';
 import * as StackTrace from 'stacktrace-js';
-import { StackFrame } from 'stacktrace-js';
-
-// export { default as createError } from './createError';
+import createError from './createError';
 
 declare var __DEBUG__: boolean;
 declare var Madcap: BrowserApi;
@@ -200,7 +198,7 @@ export function init(): CoreApi | Partial<CoreApi> {
     const strategyMap = new Map(strategyDef);
     const strategy: Strategy = (
       error: Error,
-      stackFrames: StackFrame[],
+      stackFrames: StackTrace.StackFrame[],
       attempts: Attempt[]
     ): void => {
       let resolvedStrategy;
@@ -240,6 +238,7 @@ export function init(): CoreApi | Partial<CoreApi> {
   const api = {
     attempt,
     configure,
+    createError,
     createReportStrategy,
     createHandleStrategy
   };

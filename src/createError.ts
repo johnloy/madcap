@@ -1,138 +1,132 @@
-// function validateMessage(message) {
-//   if (typeof message !== 'string' && typeof message !== 'function') {
-//     throw new TypeError(
-//       'message either needs to be a string or a function that returns a string'
-//     );
-//   }
-//   return true;
-// }
+import {
+  CustomErrorConstructor,
+  CustomErrorProps,
+  MadcapError
+} from 'madcap.d';
 
-// function createError(name, ParentError = Error, defaultProps = {}) {
-//   if (typeof name !== 'string') {
-//     throw new TypeError('expected "name" to be a string.');
-//   }
+function arePropsValid(props: any): props is CustomErrorProps {
+  return (
+    typeof props.message === 'string' || typeof props.message === 'function'
+  );
+}
 
-//   if (
-//     ParentError !== Error &&
-//     !Error.prototype.isPrototypeOf(ParentError.prototype)
-//   ) {
-//     throw new TypeError(
-//       'expected "ParentError" to extend Error or a subclass of Error'
-//     );
-//   }
+function validateMessage(props: CustomErrorProps | {}) {
+  if (!arePropsValid(props)) {
+    throw new TypeError(
+      'message either needs to be a string or a function that returns a string'
+    );
+  }
+  return true;
+}
 
-//   const { message: defaultMessage, ...restDefaultProps } = defaultProps;
+function createError(
+  name: string,
+  ParentError = Error,
+  defaultProps: CustomErrorProps = {}
+): CustomErrorConstructor {
+  if (typeof name !== 'string') {
+    throw new TypeError('expected "name" to be a string.');
+  }
 
-//   validateMessage(defaultMessage);
-//   let getMessage =
-//     typeof defaultMessage === 'string' ? () => defaultMessage : defaultMessage;
+  if (
+    ParentError !== Error &&
+    !Error.prototype.isPrototypeOf(ParentError.prototype)
+  ) {
+    throw new TypeError(
+      'expected "ParentError" to extend Error or a subclass of Error'
+    );
+  }
 
-//   const CustomError = function(message, props) {
-//     if (!(this instanceof CustomError)) {
-//       return new CustomError(message, props);
-//     }
+  validateMessage(defaultProps);
 
-//     var proxy = new ParentError();
+  const {
+    message: defaultMessage,
+    ...restDefaultProps
+  } = defaultProps as CustomErrorProps;
 
-//     Object.setPrototypeOf(proxy, Object.getPrototypeOf(this));
+  let getMessage =
+    typeof defaultMessage === 'string' ? () => defaultMessage : defaultMessage;
 
-//     if (Error.captureStackTrace) {
-//       Error.captureStackTrace(proxy, CustomError);
-//     }
+  const CustomError: CustomErrorConstructor = function(
+    message: string,
+    props?: {}
+  ): Error {
+    if (!(this instanceof CustomError)) {
+      return CustomError(message, props);
+    }
 
-//     Object.assign(proxy, props);
+    let proxy = new ParentError();
 
-//     proxy.name = name;
+    Object.setPrototypeOf(proxy, Object.getPrototypeOf(this));
 
-//     proxy.message =
-//       typeof message === 'function'
-//         ? message(proxy)
-//         : message || getMessage(proxy);
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(proxy, CustomError);
+    }
 
-//     return proxy;
-//   };
+    Object.assign(proxy, props);
 
-//   if (Object.setPrototypeOf) {
-//     Object.setPrototypeOf(CustomError, ParentError);
-//   } else {
-//     CustomError.__proto__ = ParentError;
-//   }
+    proxy.name = name;
 
-//   delete CustomError.name;
-//   Object.defineProperty(CustomError, 'name', {
-//     value: name,
-//     enumerable: false,
-//     configurable: true,
-//     writable: false
-//   });
+    proxy.message =
+      typeof message === 'function'
+        ? message(proxy)
+        : message || getMessage(proxy);
 
-//   CustomError.configure = function(config) {
-//     if (
-//       typeof config.message !== 'string' &&
-//       typeof config.message !== 'function'
-//     ) {
-//       throw new TypeError(
-//         'message either needs to be a string or a function that returns a string'
-//       );
-//     } else {
-//       getMessage =
-//         typeof config.message === 'string'
-//           ? () => config.message
-//           : config.message;
-//     }
-//     const { message, ...configRest } = config;
-//     Object.assign(CustomError.prototype, configRest);
-//   };
+    return proxy;
+  };
 
-//   CustomError.prototype = Object.create(ParentError.prototype, {
-//     constructor: {
-//       value: CustomError,
-//       enumerable: false,
-//       configurable: true,
-//       writable: true
-//     },
-//     toString: {
-//       value: function() {
-//         return 'foo';
-//       },
-//       enumerable: false,
-//       configurable: true,
-//       writable: true
-//     }
-//   });
+  if (Object.setPrototypeOf) {
+    Object.setPrototypeOf(CustomError, ParentError);
+  } else {
+    CustomError.__proto__ = ParentError;
+  }
 
-//   Object.assign(CustomError.prototype, restDefaultProps);
+  Object.defineProperty(CustomError, 'name', {
+    value: name,
+    enumerable: false,
+    configurable: true,
+    writable: false
+  });
 
-//   return CustomError;
-// }
+  CustomError.configure = function(config: CustomErrorProps) {
+    validateMessage(config);
+    if (
+      typeof config.message !== 'string' &&
+      typeof config.message !== 'function'
+    ) {
+      throw new TypeError(
+        'message either needs to be a string or a function that returns a string'
+      );
+    } else {
+      getMessage =
+        typeof config.message === 'string'
+          ? () => config.message
+          : config.message;
+    }
+    const { message, ...configRest } = config;
+    Object.assign(CustomError.prototype, configRest);
+  };
 
-// export default createError;
+  CustomError.prototype = Object.create(ParentError.prototype, {
+    constructor: {
+      value: CustomError,
+      enumerable: false,
+      configurable: true,
+      writable: true
+    },
+    toString: {
+      value: function() {
+        return 'foo';
+      },
+      enumerable: false,
+      configurable: true,
+      writable: true
+    }
+  });
 
-// // FetchError = createError('FetchError', Error, {
-// //   message: ({ statusCode }) => {
-// //     return `something went wrong with fetch: ${statusCode}`;
-// //   },
-// //   statusCode: 400
-// // });
+  Object.assign(CustomError.prototype, restDefaultProps);
 
-// // BadShitError = createError('BadShitError', FetchError, { message: 'bad shit' });
+  return CustomError;
+}
 
-// // FetchError.configure({
-// //   message: ({ statusCode }) => {
-// //     return `Nope: ${statusCode}`;
-// //   }
-// // });
-
-// // try {
-// //   throw new BadShitError(null, { statusCode: 500 });
-// // } catch (err) {
-// //   console.error(err);
-// // }
-
-// // class MyError extends Error {}
-
-// // try {
-// //   throw new MyError("blah");
-// // } catch (err) {
-// //   console.error(err);
-// // }
+export default createError;

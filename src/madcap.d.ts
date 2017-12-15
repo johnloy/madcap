@@ -1,5 +1,6 @@
 /// <reference types="stacktrace-js" />
 import * as StackTrace from 'stacktrace-js';
+import createError from 'createError';
 
 export as namespace Madcap;
 
@@ -93,4 +94,18 @@ export interface Strategy extends ErrorHandler {
   add?: (constr: Error, strategy: ErrorHandler) => void;
   remove?: (constr: Error, strategy: ErrorHandler) => void;
   setDefault?: (strategy: ErrorHandler) => ErrorHandler;
+}
+
+export interface MessageBuilder {
+  (props: {}): string;
+}
+
+export interface CustomErrorProps {
+  [key: string]: any;
+}
+
+export interface CustomErrorConstructor {
+  (message: string, props?: {}): Error;
+  __proto__?: {};
+  configure?: (config: {}) => void;
 }

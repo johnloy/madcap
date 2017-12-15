@@ -25,21 +25,33 @@ window.__QA__ = false;
  */
 window.__DEBUG__ = __DEVELOPMENT__ || __QA__;
 
+const { attempt, createError } = Madcap;
+
+FetchError = createError('FetchError', Error, {
+  message: ({ statusCode }) => {
+    return `something went wrong with fetch: ${statusCode}`;
+  },
+  statusCode: 400
+});
+
+BadShitError = createError('BadShitError', FetchError, { message: 'bad shit' });
+
 Madcap.configure({
-  // report: Madcap.createReportStrategy([
-  //   [
-  //     Error,
-  //     error => {
-  //       console.error(error);
-  //     }
-  //   ]
-  //   // [
-  //   //   AssetLoadError,
-  //   //   error => {
-  //   //     let foo;
-  //   //   }
-  //   // ]
-  // ]),
+  report: Madcap.createReportStrategy([
+    [
+      FetchError,
+      error => {
+        console.log('yes!!!');
+        console.error(error);
+      }
+    ]
+    // [
+    //   AssetLoadError,
+    //   error => {
+    //     let foo;
+    //   }
+    // ]
+  ])
   // handle: Madcap.createHandleStrategy([
   //   [
   //     Error,
@@ -51,7 +63,26 @@ Madcap.configure({
   // ])
 });
 
-const { attempt } = Madcap;
+// FetchError.configure({
+//   message: ({ statusCode }) => {
+//     return `Nope: ${statusCode}`;
+//   }
+// });
+
+// try {
+//   throw new FetchError(null, { statusCode: 500 });
+// } catch (err) {
+//   debugger;
+//   console.error(err);
+// }
+
+// class MyError extends Error {}
+
+// try {
+//   throw new MyError("blah");
+// } catch (err) {
+//   console.error(err);
+// }
 
 /*
 Wrap every point of possible exception in a try catch. 
@@ -92,6 +123,7 @@ function doSomethingAsync(attempt) {
     // throw new Error('in attempt callback, before returning another attempt'); // 2.
     // 5) return Promise with an async operation
     return attempt('wait', () => {
+      throw new FetchError(null, { statusCode: 500 });
       throw new Error('in nested attempt callback'); // 3.
 
       return new Promise((resolve, reject) => {
