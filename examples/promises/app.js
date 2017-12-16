@@ -1,9 +1,4 @@
 /**
- * Fail fast and loud
- */
-window.__DEVELOPMENT__ = true;
-
-/**
  * Toggle production-like behaviors
  * - Minified code
  * - Hidden source maps
@@ -11,148 +6,138 @@ window.__DEVELOPMENT__ = true;
  *
  * Might either be QA or live production
  */
-window.__PRODUCTION__ = false;
+window.__PRODUCTION__ = true;
 
 /**
  * Production behavior, but with diagnostic utilities
  * not intended for production
  */
-window.__QA__ = false;
+window.__STAGING__ = true;
+
+/**
+ * Fail fast and loud
+ */
+window.__DEVELOPMENT__ = !__PRODUCTION__ && !__STAGING__;
 
 /**
  * Gather data for debugging, and either fail fast and loud
  * or recover and report errors quietly
  */
-window.__DEBUG__ = __DEVELOPMENT__ || __QA__;
+window.__DEBUG__ = __DEVELOPMENT__ || __STAGING__;
+
+const demoNumberMatch = location.search.match(/demo=(\d+)/);
+const demoNumber = demoNumberMatch ? parseInt(demoNumberMatch[1], 10) : null;
 
 const { attempt, createError } = Madcap;
 
-FetchError = createError('FetchError', Error, {
-  message: ({ statusCode }) => {
-    return `something went wrong with fetch: ${statusCode}`;
-  },
-  statusCode: 400
+const DemoError = createError('DemoError', Error, {
+  message: ({ order, where }) => `(${order}) ${where}`,
+  order: 0,
+  where: ''
 });
 
-BadShitError = createError('BadShitError', FetchError, { message: 'bad shit' });
-
-Madcap.configure({
-  report: Madcap.createReportStrategy([
-    [
-      FetchError,
-      error => {
-        console.log('yes!!!');
-        console.error(error);
-      }
-    ]
-    // [
-    //   AssetLoadError,
-    //   error => {
-    //     let foo;
-    //   }
-    // ]
-  ])
-  // handle: Madcap.createHandleStrategy([
-  //   [
-  //     Error,
-  //     error => {
-  //       console.log('woops');
-  //       console.error(error);
-  //     }
-  //   ]
-  // ])
-});
-
-// FetchError.configure({
-//   message: ({ statusCode }) => {
-//     return `Nope: ${statusCode}`;
-//   }
+// DemoError.configure({
+//   message: ({ order, where }) => `(${order}) ${where}`
 // });
 
-// try {
-//   throw new FetchError(null, { statusCode: 500 });
-// } catch (err) {
-//   debugger;
-//   console.error(err);
-// }
-
-// class MyError extends Error {}
-
-// try {
-//   throw new MyError("blah");
-// } catch (err) {
-//   console.error(err);
-// }
-
-/*
-Wrap every point of possible exception in a try catch. 
-When not in debug mode, attempt to recover.
-When in debug mode, fail noticeably.
-When in debug mode use window.onerror to block the UI.
-Always use window.onerror for logging.
-
-1. error in sync function executing function returning a promise
-handle with 
-handle with window.onerror
-
-2. error in sync function returning a promise
-handle with window.onerror
-
-3. error in the promise initializer
-failure callback
-
-4. error in failure callback for then
-.catch
-
-5. error in async function
-.onerror
-ideally failure callback for then
-
-error in promise then
-
-error in failure callback for the
-
-*/
+Madcap.configure({
+  // report: Madcap.createReportStrategy([
+  //   [
+  //     DemoError,
+  //     error => {
+  //       if (__DEBUG__) {
+  //         debugger;
+  //         console.error(error);
+  //       }
+  //     }
+  //   ]
+  // ]),
+  handle: Madcap.createHandleStrategy([
+    [
+      DemoError,
+      error => {
+        const errorOverlayHTML = `
+          <div class="error-overlay">
+              <div class="error-message">${error.message}</div>
+          </div>
+        `;
+        const errorOverlayFrag = document
+          .createRange()
+          .createContextualFragment(errorOverlayHTML);
+        document.body.insertAdjacentHTML('afterbegin', errorOverlayHTML);
+      }
+    ]
+  ])
+});
 
 function doSomethingAsync(attempt) {
-  // throw new Error(
-  //   'in sync function returning an attempt promise back to a parent attempt'
-  // );
-  // 2) called doSomethingAsync()
-  const firstAttempt = attempt('something async', attempt => {
-    // throw new Error('in attempt callback, before returning another attempt'); // 2.
-    // 5) return Promise with an async operation
-    return attempt('wait', () => {
-      throw new FetchError(null, { statusCode: 500 });
-      throw new Error('in nested attempt callback'); // 3.
+  if (demoNumber === 4) {
+    throw new DemoError({
+      order: 4,
+      where: 'in sync function returning a promise back to a parent attempt'
+    });
+  }
+  const concurrentAttempt1 = attempt('concurrent attempt #1', attempt => {
+    if (demoNumber === 5) {
+      throw new DemoError({
+        order: 5,
+        where: 'in concurrent attempt callback #1'
+      });
+    }
+    return attempt('example with setTimeout', async () => {
+      if (demoNumber === 7) {
+        throw new DemoError({
+          order: 7,
+          where: 'in nested attempt callback'
+        });
+      }
 
       return new Promise((resolve, reject) => {
-        // done
-        // throw new Error('error in promise executor') // 3.
-        setTimeout(() => {
-          try {
-            // done
-            // throw new Error('error in async operation');
-          } catch (error) {
-            reject(error);
-          }
-          // done
-          // reject(new Error('[doSomethingAsync] reject in async operation'));
-          resolve('[doSomethingAsync] resolve in async operation');
-        }, 300);
+        if (demoNumber === 8) {
+          throw new DemoError({
+            order: 8,
+            where: 'error in promise executor'
+          });
+        }
+        if (demoNumber === 9) {
+          reject(
+            new DemoError({
+              order: 9,
+              where: 'reject in promise executor'
+            })
+          );
+        }
 
-        // reject(new Error('[doSomethingAsync] reject in promise initializer'));
-        // resolve('[doSomethingAsync] resolve in promise initializer');
+        setTimeout(() => {
+          if (demoNumber >= 10) {
+            // throw new DemoError({
+            //   order: 10,
+            //   where: 'in a setTimeout callback'
+            // });
+            reject(
+              new DemoError({
+                order: 10,
+                where: 'Promise rejection in a setTimeout callback'
+              })
+            );
+          }
+          resolve('Promise resolution in a setTimeout callback');
+        }, 300);
       });
     });
   });
 
-  const secondAttempt = attempt('sibling attempt', () => {
-    // throw new Error('in sibling attempt');
+  const concurrentAttempt2 = attempt('concurrent attempt #2', () => {
+    if (demoNumber === 6) {
+      throw new DemoError({
+        order: 6,
+        where: 'in concurrent attempt callback #2'
+      });
+    }
     return true;
   });
 
-  return Promise.all([firstAttempt, secondAttempt]);
+  return Promise.all([concurrentAttempt1, concurrentAttempt2]);
 }
 
 function bootstrap(attempt) {
@@ -160,35 +145,60 @@ function bootstrap(attempt) {
     isBoostrapped: false
   };
 
-  //   throw new Error(`in function before first attempt`); // 1.
+  if (demoNumber === 2) {
+    throw new DemoError({
+      order: 2,
+      where: 'in root attempt callback function'
+    });
+  }
 
-  return attempt('bootstrap', async attempt => {
-    // throw new Error('in root attempt callback function');
-    return doSomethingAsync(attempt)
+  return attempt('async bootstrap step', async attempt => {
+    if (demoNumber === 3) {
+      throw new DemoError({
+        order: 3,
+        where: 'in subattempt callback function (async)'
+      });
+    }
+    await doSomethingAsync(attempt)
       .then(
         () => {
-          throw new Error('error in doSomethingAsync then');
-          console.log('success in then');
+          if (demoNumber === 11) {
+            throw new DemoError({
+              order: 11,
+              where: 'error in a Promise then'
+            });
+          }
+        },
+        error => {
+          if (demoNumber > 11) {
+            throw new DemoError({
+              order: 11,
+              where: 'error in a Promise then error callback'
+            });
+          }
+          throw error;
         }
-        // error => {
-        //   throw new Error("error in failure callback for then");
-        //   console.log("failure callback for then\n", error);
-        // }
       )
       .catch(error => {
+        if (demoNumber === 13) {
+          throw new DemoError({
+            order: 13,
+            where: 'error in a Promise catch'
+          });
+        }
+        if (demoNumber === 14) {
+          console.log('handle failure in doSomethingAsync Promise chain');
+        }
         throw error;
       });
   });
 }
 
-function someUserAction() {
-  attempt('user action', () => {
-    throw new Error('something broke');
+if (demoNumber === 1) {
+  throw new DemoError({
+    order: 1,
+    where: 'before bootstrap'
   });
 }
 
-// throw new Error('before bootstrap');
-
-attempt('init', bootstrap);
-
-// someUserAction();
+attempt('bootstrap', { foo: 'bar' }, bootstrap);
