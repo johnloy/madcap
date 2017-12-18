@@ -78,3 +78,19 @@ Handling exceptions with assets load failures
 - image loading
 - image errors
 - fonts
+
+What are the problems we need solve?
+- Centralized management of error handling and reporting/logging
+- Cross-browser compatibility
+- Works for browsers and servers (universal)
+- Different outcomes for different app environments or stages
+- Classified error types for a cascading handling strategy
+- Extending builtin Error
+- Clean and accurate stack traces
+- Async stack traces
+- Unified error handling approach for sync and async code
+- Associating app state context with an error instance
+- Serialization of errors for transmission and logging
+- Easy configuration to work in conjunction with popular error monitoring services
+- Error representations serve developers, testers, and end users
+- Localization of error messages

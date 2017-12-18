@@ -1,7 +1,8 @@
 import {
-  CustomErrorConstructor,
+  CustomError,
   CustomErrorProps,
-  MadcapError
+  MadcapError,
+  MessageBuilder
 } from 'madcap.d';
 
 function arePropsValid(props: any): props is CustomErrorProps {
@@ -23,7 +24,7 @@ function createError(
   name: string,
   ParentError = Error,
   defaultProps: CustomErrorProps = {}
-): CustomErrorConstructor {
+): CustomError {
   if (typeof name !== 'string') {
     throw new TypeError('expected "name" to be a string.');
   }
@@ -47,15 +48,20 @@ function createError(
   let getMessage =
     typeof defaultMessage === 'string' ? () => defaultMessage : defaultMessage;
 
-  const CustomError: CustomErrorConstructor = function(
-    message: string,
-    props?: {}
-  ): Error {
+  const CustomError: any = function(
+    message?: MessageBuilder | string | CustomErrorProps,
+    props?: CustomErrorProps
+  ): Partial<MadcapError> {
     if (!(this instanceof CustomError)) {
-      return CustomError(message, props);
+      return new (CustomError as CustomError)(message, props);
     }
 
-    let proxy = new ParentError();
+    if (arguments.length === 1) {
+      props = message as CustomErrorProps;
+      message = props.message;
+    }
+
+    const proxy = new ParentError();
 
     Object.setPrototypeOf(proxy, Object.getPrototypeOf(this));
 
@@ -126,7 +132,7 @@ function createError(
 
   Object.assign(CustomError.prototype, restDefaultProps);
 
-  return CustomError;
+  return CustomError as CustomError;
 }
 
 export default createError;

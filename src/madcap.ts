@@ -14,26 +14,16 @@ import {
 } from 'madcap.d';
 import * as StackTrace from 'stacktrace-js';
 import createError from './createError';
+import reportToConsole from './reporters/console';
 
-declare var __DEBUG__: boolean;
-declare var Madcap: BrowserApi;
+declare var Madcap: any;
 
-function reportToConsole(
-  error: MadcapError,
-  stackframes: StackTrace.StackFrame[],
-  attempts: Attempt[]
-) {
-  if (__DEBUG__) {
-    console.group('%c%s', 'color: red', error.message);
-    console.error(error);
-    console.info(
-      `Location: ${error.fileName}:${error.lineNumber}:${
-        error.columnNumber
-      }\n` + `Attempting: ${attempts.map(a => a[0]).reverse()}\n` // +
-      // `State: ${JSON.stringify(errorMeta.state)}`
-    );
+const UndefinedAttemptError = createError('UndefinedAttempError', Error, {
+  attemptName: '',
+  message: (e: MadcapError) => {
+    return `Attempt "${e.attemptName}" failed because undefined was returned`;
   }
-}
+});
 
 function warnToConfigureHandle(): void {
   console.warn('You need to configure a handler');
@@ -44,10 +34,23 @@ export function init(): CoreApi | Partial<CoreApi> {
 
   const config: Config = {
     report: reportToConsole,
-    handle: warnToConfigureHandle
+    handle: warnToConfigureHandle,
+    allowUndefinedAttempts: false
   };
 
+  function isStrategyMap(strategy: any): strategy is StrategyMap {
+    return strategy && (Array.isArray(strategy) || strategy instanceof Map);
+  }
+
   function configure(mergeConfig: Partial<Config>): Config {
+    if (isStrategyMap(mergeConfig.report)) {
+      mergeConfig.report = createReportStrategy(mergeConfig.report!);
+    }
+
+    if (isStrategyMap(mergeConfig.handle)) {
+      mergeConfig.handle = createHandleStrategy(mergeConfig.handle);
+    }
+
     Object.assign(config, mergeConfig);
 
     // By default, v8 includes the 10 topmost stack frames
@@ -68,17 +71,17 @@ export function init(): CoreApi | Partial<CoreApi> {
     const topFrame: StackTrace.StackFrame = stackFrames[0];
 
     const attempts =
-      attemptsMap.get(error.attemptsRoot) ||
+      attemptsMap.get(error.attemptFn) ||
       [...Array.from(attemptsMap.values())][0] ||
       [];
     const attemptName =
-      (attempts[0] && attempts[0][0]) || 'before first attempt';
+      (attempts[0] && attempts[0].name) || 'before first attempt';
 
     const msg = (error.message = `[APP/${attemptName}] ${error.message}`);
 
     if (stackFrames.length === 1) {
       const shouldAppendFrames = !attempts.some((attempt: Attempt) => {
-        const attemptFrames = attempt[1];
+        const attemptFrames = attempt.stackFrames;
         return attemptFrames.some(
           frame =>
             frame.fileName === topFrame.fileName &&
@@ -90,7 +93,7 @@ export function init(): CoreApi | Partial<CoreApi> {
         stackFrames = attempts.reduce(
           (frames: StackTrace.StackFrame[], attempt: Attempt) => [
             ...frames,
-            ...attempt[1]
+            ...attempt.stackFrames
           ],
           [stackFrames[0]]
         );
@@ -130,11 +133,46 @@ export function init(): CoreApi | Partial<CoreApi> {
     stackFrames?: StackTrace.StackFrame[]
   ) => cleanStack(stackFrame, index, stackFrames, true);
 
-  async function attempt(
+  function isAttemptFunction(a: any): a is AttemptFunction {
+    return typeof a === 'function';
+  }
+
+  /**
+   * Wrap a function with a Promise having at the end of its chain
+   * a catch callback that reports and handles errors.
+   *
+   * @param {AttemptName} name
+   * @param {AttemptFunction | any} contextOrFn
+   * @param {Attempt[] | AttemptFunction} [pastAttempts]
+   * @returns {Promise<any>}
+   */
+  function attempt(
     name: AttemptName,
     fn: AttemptFunction,
     pastAttempts?: Attempt[]
+  ): Promise<any>;
+  function attempt(
+    name: AttemptName,
+    context: any,
+    fn: AttemptFunction,
+    pastAttempts?: Attempt[]
+  ): Promise<any>;
+  async function attempt(
+    name: AttemptName,
+    contextOrFn?: any,
+    fnOrPastAttempts?: Attempt[] | AttemptFunction,
+    pastAttempts?: Attempt[]
   ): Promise<any> {
+    let context: any;
+    let fn: AttemptFunction;
+    if (isAttemptFunction(fnOrPastAttempts)) {
+      context = contextOrFn;
+      fn = fnOrPastAttempts;
+    } else {
+      fn = contextOrFn;
+      pastAttempts = fnOrPastAttempts;
+    }
+
     const stackFrames = await StackTrace.fromError(new Error(), {
       filter: cleanAttemptStack
     });
@@ -142,7 +180,7 @@ export function init(): CoreApi | Partial<CoreApi> {
     let attempts = pastAttempts || attemptsMap.get(fn) || [];
 
     if (!attempts.length) {
-      attempts = [[name, stackFrames]];
+      attempts = [{ name, function: fn, stackFrames, context }];
       attemptsMap.set(fn, attempts);
       const ret = attempt(name, fn).catch(async (error: MadcapError) => {
         if (!error.trace) {
@@ -151,7 +189,7 @@ export function init(): CoreApi | Partial<CoreApi> {
           });
           const newStackFrames = attempts
             .reverse()
-            .map((attempt: Attempt) => attempt[1])
+            .map((attempt: Attempt) => attempt.stackFrames)
             .reduce(
               (
                 result: StackTrace.StackFrame[],
@@ -160,16 +198,22 @@ export function init(): CoreApi | Partial<CoreApi> {
               []
             );
           error.trace = error.trace.concat(newStackFrames);
-          error.attemptsRoot = fn;
+          error.attemptFn = fn;
+          error.attempts = attempts.reverse();
           prepareError(error);
-          config.report(error, stackFrames!, attempts);
-          config.handle(error, stackFrames!, attempts);
+          config.report(error);
+          config.handle(error);
         }
+
+        // Prevent a subsequent .then callback from running
+        throw error;
       });
       return ret;
     }
 
-    attempts.push([name, stackFrames]);
+    if (fn !== attempts[0].function) {
+      attempts.push({ name, function: fn, stackFrames, context });
+    }
 
     function subattempt(name: AttemptName, fn: AttemptFunction): Promise<any> {
       return attempt(name, fn, attempts);
@@ -178,11 +222,16 @@ export function init(): CoreApi | Partial<CoreApi> {
     try {
       const ret = fn(subattempt);
       if (ret === undefined) {
-        throw new Error('failed attempting ' + name);
+        if (!config.allowUndefinedAttempts) {
+          throw new UndefinedAttemptError({ attemptName: name });
+        }
+        console.warn(
+          `Attempt ${name} returns undefined. Is it a work in progress?`
+        );
       }
       return ret;
     } catch (error) {
-      throw error;
+      return Promise.reject(error);
     }
   }
 
@@ -196,17 +245,16 @@ export function init(): CoreApi | Partial<CoreApi> {
 
   function createStrategy(strategyDef: StrategyMap): Strategy {
     const strategyMap = new Map(strategyDef);
-    const strategy: Strategy = (
-      error: Error,
-      stackFrames: StackTrace.StackFrame[],
-      attempts: Attempt[]
-    ): void => {
+    const strategy: Strategy = (error: Error): void => {
       let resolvedStrategy;
-      if (!strategyMap.has((error as any).constructor)) {
+      const match = Array.from(strategyMap.keys()).find(
+        (constr: Function) => error instanceof constr
+      );
+      if (match) {
+        resolvedStrategy = strategyMap.get(match);
+      } else {
         if (!strategy.__default__) return;
         resolvedStrategy = strategy.__default__;
-      } else {
-        resolvedStrategy = strategyMap.get((error as any).constructor);
       }
       resolvedStrategy!(error);
     };
@@ -258,7 +306,9 @@ if (typeof window !== 'undefined') {
     ...browserApi
   } = coreApi as CoreApi;
 
-  Madcap = browserApi;
+  // Madcap = browserApi;
+  Madcap = browserApi.configure;
+  Object.assign(Madcap, browserApi);
 
   window.onerror = (msg, url, line, col, error) => {
     if (error) {

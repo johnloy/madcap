@@ -1335,25 +1335,33 @@ var __rest = (this && this.__rest) || function (s, e) {
 Object.defineProperty(exports, "__esModule", { value: true });
 var StackTrace = __webpack_require__(6);
 var createError_1 = __webpack_require__(17);
-function reportToConsole(error, stackframes, attempts) {
-    if (__DEBUG__) {
-        console.group('%c%s', 'color: red', error.message);
-        console.error(error);
-        console.info("Location: " + error.fileName + ":" + error.lineNumber + ":" + error.columnNumber + "\n" + ("Attempting: " + attempts.map(function (a) { return a[0]; }).reverse() + "\n") // +
-        // `State: ${JSON.stringify(errorMeta.state)}`
-        );
+var console_1 = __webpack_require__(18);
+var UndefinedAttemptError = createError_1.default('UndefinedAttempError', Error, {
+    attemptName: '',
+    message: function (e) {
+        return "Attempt \"" + e.attemptName + "\" failed because undefined was returned";
     }
-}
+});
 function warnToConfigureHandle() {
     console.warn('You need to configure a handler');
 }
 function init() {
     var attemptsMap = new Map();
     var config = {
-        report: reportToConsole,
-        handle: warnToConfigureHandle
+        report: console_1.default,
+        handle: warnToConfigureHandle,
+        allowUndefinedAttempts: false
     };
+    function isStrategyMap(strategy) {
+        return strategy && (Array.isArray(strategy) || strategy instanceof Map);
+    }
     function configure(mergeConfig) {
+        if (isStrategyMap(mergeConfig.report)) {
+            mergeConfig.report = createReportStrategy(mergeConfig.report);
+        }
+        if (isStrategyMap(mergeConfig.handle)) {
+            mergeConfig.handle = createHandleStrategy(mergeConfig.handle);
+        }
         Object.assign(config, mergeConfig);
         // By default, v8 includes the 10 topmost stack frames
         // https://github.com/v8/v8/wiki/Stack-Trace-API#basic-stack-traces
@@ -1366,14 +1374,14 @@ function init() {
     function prepareError(error, stackFrames) {
         stackFrames = error.trace || stackFrames;
         var topFrame = stackFrames[0];
-        var attempts = attemptsMap.get(error.attemptsRoot) ||
+        var attempts = attemptsMap.get(error.attemptFn) ||
             Array.from(attemptsMap.values()).slice()[0] ||
             [];
-        var attemptName = (attempts[0] && attempts[0][0]) || 'before first attempt';
+        var attemptName = (attempts[0] && attempts[0].name) || 'before first attempt';
         var msg = (error.message = "[APP/" + attemptName + "] " + error.message);
         if (stackFrames.length === 1) {
             var shouldAppendFrames = !attempts.some(function (attempt) {
-                var attemptFrames = attempt[1];
+                var attemptFrames = attempt.stackFrames;
                 return attemptFrames.some(function (frame) {
                     return frame.fileName === topFrame.fileName &&
                         frame.lineNumber === topFrame.lineNumber &&
@@ -1381,7 +1389,7 @@ function init() {
                 });
             });
             if (shouldAppendFrames) {
-                stackFrames = attempts.reduce(function (frames, attempt) { return frames.concat(attempt[1]); }, [stackFrames[0]]);
+                stackFrames = attempts.reduce(function (frames, attempt) { return frames.concat(attempt.stackFrames); }, [stackFrames[0]]);
             }
         }
         var stackString = stackFrames
@@ -1403,23 +1411,35 @@ function init() {
         return index === 0 || !isAttemptFn;
     }
     var cleanAttemptStack = function (stackFrame, index, stackFrames) { return cleanStack(stackFrame, index, stackFrames, true); };
-    function attempt(name, fn, pastAttempts) {
+    function isAttemptFunction(a) {
+        return typeof a === 'function';
+    }
+    function attempt(name, contextOrFn, fnOrPastAttempts, pastAttempts) {
         return __awaiter(this, void 0, void 0, function () {
             var _this = this;
             function subattempt(name, fn) {
                 return attempt(name, fn, attempts);
             }
-            var stackFrames, attempts, ret, ret;
+            var context, fn, stackFrames, attempts, ret, ret;
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, StackTrace.fromError(new Error(), {
-                            filter: cleanAttemptStack
-                        })];
+                    case 0:
+                        if (isAttemptFunction(fnOrPastAttempts)) {
+                            context = contextOrFn;
+                            fn = fnOrPastAttempts;
+                        }
+                        else {
+                            fn = contextOrFn;
+                            pastAttempts = fnOrPastAttempts;
+                        }
+                        return [4 /*yield*/, StackTrace.fromError(new Error(), {
+                                filter: cleanAttemptStack
+                            })];
                     case 1:
                         stackFrames = _a.sent();
                         attempts = pastAttempts || attemptsMap.get(fn) || [];
                         if (!attempts.length) {
-                            attempts = [[name, stackFrames]];
+                            attempts = [{ name: name, function: fn, stackFrames: stackFrames, context: context }];
                             attemptsMap.set(fn, attempts);
                             ret = attempt(name, fn).catch(function (error) { return __awaiter(_this, void 0, void 0, function () {
                                 var _a, newStackFrames;
@@ -1435,30 +1455,38 @@ function init() {
                                             _a.trace = _b.sent();
                                             newStackFrames = attempts
                                                 .reverse()
-                                                .map(function (attempt) { return attempt[1]; })
+                                                .map(function (attempt) { return attempt.stackFrames; })
                                                 .reduce(function (result, frames) { return result.concat(frames); }, []);
                                             error.trace = error.trace.concat(newStackFrames);
-                                            error.attemptsRoot = fn;
+                                            error.attemptFn = fn;
+                                            error.attempts = attempts.reverse();
                                             prepareError(error);
-                                            config.report(error, stackFrames, attempts);
-                                            config.handle(error, stackFrames, attempts);
+                                            config.report(error);
+                                            config.handle(error);
                                             _b.label = 2;
-                                        case 2: return [2 /*return*/];
+                                        case 2: 
+                                        // Prevent a subsequent .then callback from running
+                                        throw error;
                                     }
                                 });
                             }); });
                             return [2 /*return*/, ret];
                         }
-                        attempts.push([name, stackFrames]);
+                        if (fn !== attempts[0].function) {
+                            attempts.push({ name: name, function: fn, stackFrames: stackFrames, context: context });
+                        }
                         try {
                             ret = fn(subattempt);
                             if (ret === undefined) {
-                                throw new Error('failed attempting ' + name);
+                                if (!config.allowUndefinedAttempts) {
+                                    throw new UndefinedAttemptError({ attemptName: name });
+                                }
+                                console.warn("Attempt " + name + " returns undefined. Is it a work in progress?");
                             }
                             return [2 /*return*/, ret];
                         }
                         catch (error) {
-                            throw error;
+                            return [2 /*return*/, Promise.reject(error)];
                         }
                         return [2 /*return*/];
                 }
@@ -1472,15 +1500,16 @@ function init() {
     }
     function createStrategy(strategyDef) {
         var strategyMap = new Map(strategyDef);
-        var strategy = function (error, stackFrames, attempts) {
+        var strategy = function (error) {
             var resolvedStrategy;
-            if (!strategyMap.has(error.constructor)) {
+            var match = Array.from(strategyMap.keys()).find(function (constr) { return error instanceof constr; });
+            if (match) {
+                resolvedStrategy = strategyMap.get(match);
+            }
+            else {
                 if (!strategy.__default__)
                     return;
                 resolvedStrategy = strategy.__default__;
-            }
-            else {
-                resolvedStrategy = strategyMap.get(error.constructor);
             }
             resolvedStrategy(error);
         };
@@ -1498,7 +1527,7 @@ function init() {
     }
     function createReportStrategy(strategyDef) {
         var strategy = createStrategy(strategyDef);
-        strategy.setDefault(reportToConsole);
+        strategy.setDefault(console_1.default);
         return strategy;
     }
     function createHandleStrategy(strategyDef) {
@@ -1522,7 +1551,9 @@ exports.init = init;
 if (typeof window !== 'undefined') {
     var coreApi = init();
     var _a = coreApi, cleanStack_1 = _a.cleanStack, prepareError_1 = _a.prepareError, config_1 = _a.config, browserApi = __rest(_a, ["cleanStack", "prepareError", "config"]);
-    Madcap = browserApi;
+    // Madcap = browserApi;
+    Madcap = browserApi.configure;
+    Object.assign(Madcap, browserApi);
     window.onerror = function (msg, url, line, col, error) {
         if (error) {
             StackTrace.fromError(error, { filter: cleanStack_1 })
@@ -4334,7 +4365,11 @@ function createError(name, ParentError, defaultProps) {
     var getMessage = typeof defaultMessage === 'string' ? function () { return defaultMessage; } : defaultMessage;
     var CustomError = function (message, props) {
         if (!(this instanceof CustomError)) {
-            return CustomError(message, props);
+            return new CustomError(message, props);
+        }
+        if (arguments.length === 1) {
+            props = message;
+            message = props.message;
         }
         var proxy = new ParentError();
         Object.setPrototypeOf(proxy, Object.getPrototypeOf(this));
@@ -4396,6 +4431,46 @@ function createError(name, ParentError, defaultProps) {
     return CustomError;
 }
 exports.default = createError;
+
+
+/***/ }),
+/* 18 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+var Attempt = /** @class */ (function () {
+    function Attempt(fn) {
+        this.location = '';
+    }
+    return Attempt;
+}());
+function reportToConsole(error) {
+    if (__DEBUG__) {
+        console.group('%c%s', 'color: red', error.message);
+        console.error(error);
+        console.info("Location: " + error.fileName + ":" + error.lineNumber + ":" + error.columnNumber + "\n" //+ `Attempting: ${error.attempts.map(a => a.name).reverse()}\n` // +
+        // `State: ${JSON.stringify(errorMeta.state)}`
+        );
+        var attemptsReportStr = error.attempts.reduce(function (report, attempt, index) {
+            report += '%d)    Name: %s\n';
+            report += '   Context: %O\n';
+            report += "  Function: %O\n";
+            report += '\n';
+            return report;
+        }, '');
+        var attemptsReportLogValues = error.attempts.reduce(function (report, attempt, index) {
+            report.push(index + 1);
+            report.push(attempt.name);
+            report.push(attempt.context || 'none provided');
+            report.push(new Attempt(attempt.function));
+            return report;
+        }, []);
+        console.log.apply(console, ["Attempts:\n\n" + attemptsReportStr].concat(attemptsReportLogValues));
+    }
+}
+exports.default = reportToConsole;
 
 
 /***/ })

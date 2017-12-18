@@ -1,6 +1,7 @@
 /// <reference types="stacktrace-js" />
 import * as StackTrace from 'stacktrace-js';
 import createError from 'createError';
+import reportToConsole from 'reporters/console';
 
 export as namespace Madcap;
 
@@ -37,34 +38,47 @@ export const core: {
 };
 
 export declare type AttemptName = string;
-export declare type Attempt = [AttemptName, StackTrace.StackFrame[]];
+export declare type Attempt = {
+  name: AttemptName;
+  function: AttemptFunction;
+  stackFrames: StackTrace.StackFrame[];
+  context: any;
+};
 export interface MadcapError extends Error {
   trace?: StackTrace.StackFrame[];
   fileName: string;
   lineNumber: number;
   columnNumber: number;
-  attemptsRoot: AttemptFunction;
+  attemptFn: AttemptFunction;
+  attempts: Attempt[];
+  [key: string]: any;
 }
 export interface AttemptFactory {
   (name: AttemptName, fn: AttemptFunction, pastAttempts?: Attempt[]): Promise<
     any
   >;
+  (
+    name: AttemptName,
+    context: any,
+    fn: AttemptFunction,
+    pastAttempts?: Attempt[]
+  ): Promise<any>;
+  (
+    name: AttemptName,
+    contextOrFn?: any,
+    fnOrPastAttempts?: Attempt[] | AttemptFunction,
+    pastAttempts?: Attempt[]
+  ): Promise<any>;
 }
 export interface AttemptFunction {
   (attemptFactory: AttemptFactory): any;
 }
 export interface Config {
-  report(
-    error: MadcapError,
-    stackframes: StackTrace.StackFrame[],
-    attempts: Attempt[]
-  ): void;
+  report: (error: MadcapError) => void | StrategyMap;
 
-  handle(
-    error: MadcapError,
-    stackframes: StackTrace.StackFrame[],
-    attempts: Attempt[]
-  ): void;
+  handle: (error: MadcapError) => void | StrategyMap;
+
+  allowUndefinedAttempts?: boolean;
 
   stackTraceLimit?: number;
 }
@@ -76,17 +90,15 @@ export interface MadcapError extends Error {
   fileName: string;
   lineNumber: number;
   columnNumber: number;
-  attemptsRoot: AttemptFunction;
+  attemptFn: AttemptFunction;
 }
 
-export type StrategyMap = Map<Error, ErrorHandler> | [[Error, ErrorHandler]];
+export type StrategyMap =
+  | Map<Partial<MadcapError>, ErrorHandler>
+  | [[Partial<MadcapError>, ErrorHandler]];
 
 export interface ErrorHandler {
-  (
-    error: Error,
-    stackframes?: StackTrace.StackFrame[],
-    attempts?: Attempt[]
-  ): void;
+  (error: Error): void;
 }
 
 export interface Strategy extends ErrorHandler {
@@ -104,8 +116,11 @@ export interface CustomErrorProps {
   [key: string]: any;
 }
 
-export interface CustomErrorConstructor {
-  (message: string, props?: {}): Error;
+export interface CustomError {
+  new (
+    message?: MessageBuilder | string | CustomErrorProps,
+    props?: CustomErrorProps
+  ): Partial<MadcapError>;
   __proto__?: {};
   configure?: (config: {}) => void;
 }

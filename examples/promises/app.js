@@ -40,34 +40,26 @@ const DemoError = createError('DemoError', Error, {
 //   message: ({ order, where }) => `(${order}) ${where}`
 // });
 
-Madcap.configure({
-  // report: Madcap.createReportStrategy([
-  //   [
-  //     DemoError,
-  //     error => {
-  //       if (__DEBUG__) {
-  //         debugger;
-  //         console.error(error);
-  //       }
-  //     }
-  //   ]
-  // ]),
-  handle: Madcap.createHandleStrategy([
+Madcap({
+  allowUndefinedAttempts: false,
+  handle: [
     [
       DemoError,
       error => {
-        const errorOverlayHTML = `
-          <div class="error-overlay">
-              <div class="error-message">${error.message}</div>
-          </div>
-        `;
-        const errorOverlayFrag = document
-          .createRange()
-          .createContextualFragment(errorOverlayHTML);
-        document.body.insertAdjacentHTML('afterbegin', errorOverlayHTML);
+        if (__DEBUG__) {
+          const errorOverlayHTML = `
+            <div class="error-overlay">
+                <div class="error-message">${error.message}</div>
+            </div>
+          `;
+          const errorOverlayFrag = document
+            .createRange()
+            .createContextualFragment(errorOverlayHTML);
+          document.body.insertAdjacentHTML('afterbegin', errorOverlayHTML);
+        }
       }
     ]
-  ])
+  ]
 });
 
 function doSomethingAsync(attempt) {
@@ -201,4 +193,13 @@ if (demoNumber === 1) {
   });
 }
 
-attempt('bootstrap', { foo: 'bar' }, bootstrap);
+// attempt('foo', () => {}).then(ret => {
+//   debugger;
+//   let foo = 'bar';
+// });
+
+attempt('bootstrap', { foo: 'bar' }, bootstrap, {
+  precondition: context => {}, // throw error if context is mutated
+  postcondition: (output, context) => {}, // throw error if output or context is mutated
+  invariant: context => {}
+});
