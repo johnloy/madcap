@@ -16,8 +16,6 @@ import * as StackTrace from 'stacktrace-js';
 import createError from './createError';
 import reportToConsole from './reporters/console';
 
-declare var Madcap: any;
-
 const UndefinedAttemptError = createError('UndefinedAttempError', Error, {
   attemptName: '',
   message: (e: MadcapError) => {
@@ -29,7 +27,7 @@ function warnToConfigureHandle(): void {
   console.warn('You need to configure a handler');
 }
 
-export function init(): CoreApi | Partial<CoreApi> {
+export default function Madcap(initConfig: Config): CoreApi | Partial<CoreApi> {
   const attemptsMap: AttemptsMap = new Map();
 
   const config: Config = {
@@ -37,6 +35,10 @@ export function init(): CoreApi | Partial<CoreApi> {
     handle: warnToConfigureHandle,
     allowUndefinedAttempts: false
   };
+
+  if (typeof initConfig === 'object') {
+    configure(initConfig);
+  }
 
   function isStrategyMap(strategy: any): strategy is StrategyMap {
     return strategy && (Array.isArray(strategy) || strategy instanceof Map);
@@ -200,9 +202,15 @@ export function init(): CoreApi | Partial<CoreApi> {
           error.trace = error.trace.concat(newStackFrames);
           error.attemptFn = fn;
           error.attempts = attempts.reverse();
-          prepareError(error);
-          config.report(error);
-          config.handle(error);
+
+          const errorEvent = new ErrorEvent('error', {
+            filename: error.fileName,
+            lineno: error.lineNumber,
+            colno: error.columnNumber,
+            message: error.message,
+            error
+          });
+          window.dispatchEvent(errorEvent);
         }
 
         // Prevent a subsequent .then callback from running
@@ -290,45 +298,48 @@ export function init(): CoreApi | Partial<CoreApi> {
     createReportStrategy,
     createHandleStrategy
   };
+  // if (typeof window !== 'undefined') {
+  //   Object.assign(api, { cleanStack, prepareError, config });
+  // }
+
   if (typeof window !== 'undefined') {
-    Object.assign(api, { cleanStack, prepareError, config });
+    // const coreApi = init();
+    // const {
+    //   cleanStack,
+    //   prepareError,
+    //   config,
+    //   ...browserApi
+    // } = coreApi as CoreApi;
+
+    // Madcap = browserApi;
+    // Madcap = browserApi.configure;
+    // Object.assign(Madcap, browserApi);
+
+    window.onerror = (msg, url, line, col, error: MadcapError) => {
+      if (error && !error.attempts) {
+        error.isHandled = true;
+        StackTrace.fromError(error, { filter: cleanStack })
+          .then(prepareError.bind(null, error))
+          .then(config.report!.bind(null, error))
+          .then(config.handle!.bind(null, error));
+      }
+      // Return true to prevent the browser from further handling the error
+      return true;
+    };
+
+    window.addEventListener(
+      'unhandledrejection',
+      (e: PromiseRejectionEvent) => {
+        e.preventDefault();
+        const error = e.reason;
+        if (error.isHandled) return;
+        StackTrace.fromError(error, { filter: cleanStack })
+          .then(prepareError.bind(null, error))
+          .then(config.report!.bind(null, error))
+          .then(config.handle!.bind(null, error));
+      }
+    );
   }
 
   return api;
-}
-
-if (typeof window !== 'undefined') {
-  const coreApi = init();
-  const {
-    cleanStack,
-    prepareError,
-    config,
-    ...browserApi
-  } = coreApi as CoreApi;
-
-  // Madcap = browserApi;
-  Madcap = browserApi.configure;
-  Object.assign(Madcap, browserApi);
-
-  window.onerror = (msg, url, line, col, error) => {
-    if (error) {
-      StackTrace.fromError(error, { filter: cleanStack })
-        .then(prepareError.bind(null, error))
-        .then(config.report!.bind(null, error));
-    }
-    // Return true to prevent the browser from further handling the error
-    return true;
-  };
-
-  window.addEventListener('unhandledrejection', (e: PromiseRejectionEvent) => {
-    e.preventDefault();
-    const error = e.reason;
-    if (error.trace) {
-      prepareError(error, error.trace);
-    } else {
-      StackTrace.fromError(error, { filter: cleanStack }).then(
-        prepareError.bind(null, error)
-      );
-    }
-  });
 }

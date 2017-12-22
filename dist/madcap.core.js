@@ -1323,15 +1323,6 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
-var __rest = (this && this.__rest) || function (s, e) {
-    var t = {};
-    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
-        t[p] = s[p];
-    if (s != null && typeof Object.getOwnPropertySymbols === "function")
-        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) if (e.indexOf(p[i]) < 0)
-            t[p[i]] = s[p[i]];
-    return t;
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 var StackTrace = __webpack_require__(6);
 var createError_1 = __webpack_require__(17);
@@ -1345,13 +1336,16 @@ var UndefinedAttemptError = createError_1.default('UndefinedAttempError', Error,
 function warnToConfigureHandle() {
     console.warn('You need to configure a handler');
 }
-function init() {
+function Madcap(initConfig) {
     var attemptsMap = new Map();
     var config = {
         report: console_1.default,
         handle: warnToConfigureHandle,
         allowUndefinedAttempts: false
     };
+    if (typeof initConfig === 'object') {
+        configure(initConfig);
+    }
     function isStrategyMap(strategy) {
         return strategy && (Array.isArray(strategy) || strategy instanceof Map);
     }
@@ -1442,7 +1436,7 @@ function init() {
                             attempts = [{ name: name, function: fn, stackFrames: stackFrames, context: context }];
                             attemptsMap.set(fn, attempts);
                             ret = attempt(name, fn).catch(function (error) { return __awaiter(_this, void 0, void 0, function () {
-                                var _a, newStackFrames;
+                                var _a, newStackFrames, errorEvent;
                                 return __generator(this, function (_b) {
                                     switch (_b.label) {
                                         case 0:
@@ -1460,9 +1454,14 @@ function init() {
                                             error.trace = error.trace.concat(newStackFrames);
                                             error.attemptFn = fn;
                                             error.attempts = attempts.reverse();
-                                            prepareError(error);
-                                            config.report(error);
-                                            config.handle(error);
+                                            errorEvent = new ErrorEvent('error', {
+                                                filename: error.fileName,
+                                                lineno: error.lineNumber,
+                                                colno: error.columnNumber,
+                                                message: error.message,
+                                                error: error
+                                            });
+                                            window.dispatchEvent(errorEvent);
                                             _b.label = 2;
                                         case 2: 
                                         // Prevent a subsequent .then callback from running
@@ -1542,38 +1541,45 @@ function init() {
         createReportStrategy: createReportStrategy,
         createHandleStrategy: createHandleStrategy
     };
+    // if (typeof window !== 'undefined') {
+    //   Object.assign(api, { cleanStack, prepareError, config });
+    // }
     if (typeof window !== 'undefined') {
-        Object.assign(api, { cleanStack: cleanStack, prepareError: prepareError, config: config });
+        // const coreApi = init();
+        // const {
+        //   cleanStack,
+        //   prepareError,
+        //   config,
+        //   ...browserApi
+        // } = coreApi as CoreApi;
+        // Madcap = browserApi;
+        // Madcap = browserApi.configure;
+        // Object.assign(Madcap, browserApi);
+        window.onerror = function (msg, url, line, col, error) {
+            if (error && !error.attempts) {
+                error.isHandled = true;
+                StackTrace.fromError(error, { filter: cleanStack })
+                    .then(prepareError.bind(null, error))
+                    .then(config.report.bind(null, error))
+                    .then(config.handle.bind(null, error));
+            }
+            // Return true to prevent the browser from further handling the error
+            return true;
+        };
+        window.addEventListener('unhandledrejection', function (e) {
+            e.preventDefault();
+            var error = e.reason;
+            if (error.isHandled)
+                return;
+            StackTrace.fromError(error, { filter: cleanStack })
+                .then(prepareError.bind(null, error))
+                .then(config.report.bind(null, error))
+                .then(config.handle.bind(null, error));
+        });
     }
     return api;
 }
-exports.init = init;
-if (typeof window !== 'undefined') {
-    var coreApi = init();
-    var _a = coreApi, cleanStack_1 = _a.cleanStack, prepareError_1 = _a.prepareError, config_1 = _a.config, browserApi = __rest(_a, ["cleanStack", "prepareError", "config"]);
-    // Madcap = browserApi;
-    Madcap = browserApi.configure;
-    Object.assign(Madcap, browserApi);
-    window.onerror = function (msg, url, line, col, error) {
-        if (error) {
-            StackTrace.fromError(error, { filter: cleanStack_1 })
-                .then(prepareError_1.bind(null, error))
-                .then(config_1.report.bind(null, error));
-        }
-        // Return true to prevent the browser from further handling the error
-        return true;
-    };
-    window.addEventListener('unhandledrejection', function (e) {
-        e.preventDefault();
-        var error = e.reason;
-        if (error.trace) {
-            prepareError_1(error, error.trace);
-        }
-        else {
-            StackTrace.fromError(error, { filter: cleanStack_1 }).then(prepareError_1.bind(null, error));
-        }
-    });
-}
+exports.default = Madcap;
 
 
 /***/ }),
@@ -4450,9 +4456,7 @@ function reportToConsole(error) {
     if (__DEBUG__) {
         console.group('%c%s', 'color: red', error.message);
         console.error(error);
-        console.info("Location: " + error.fileName + ":" + error.lineNumber + ":" + error.columnNumber + "\n" //+ `Attempting: ${error.attempts.map(a => a.name).reverse()}\n` // +
-        // `State: ${JSON.stringify(errorMeta.state)}`
-        );
+        console.log("Location: " + error.fileName + ":" + error.lineNumber + ":" + error.columnNumber + "\n");
         var attemptsReportStr = error.attempts.reduce(function (report, attempt, index) {
             report += '%d)    Name: %s\n';
             report += '   Context: %O\n';

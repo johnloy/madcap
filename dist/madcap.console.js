@@ -91,9 +91,7 @@ function reportToConsole(error) {
     if (__DEBUG__) {
         console.group('%c%s', 'color: red', error.message);
         console.error(error);
-        console.info("Location: " + error.fileName + ":" + error.lineNumber + ":" + error.columnNumber + "\n" //+ `Attempting: ${error.attempts.map(a => a.name).reverse()}\n` // +
-        // `State: ${JSON.stringify(errorMeta.state)}`
-        );
+        console.log("Location: " + error.fileName + ":" + error.lineNumber + ":" + error.columnNumber + "\n");
         var attemptsReportStr = error.attempts.reduce(function (report, attempt, index) {
             report += '%d)    Name: %s\n';
             report += '   Context: %O\n';

@@ -81,8 +81,23 @@ return /******/ (function(modules) { // webpackBootstrap
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-function default_1() { }
-exports.default = default_1;
+function reactErrorOverlay(error) {
+    var oldIframeReady = window.__REACT_ERROR_OVERLAY_GLOBAL_HOOK__
+        .iframeReady;
+    window.__REACT_ERROR_OVERLAY_GLOBAL_HOOK__.iframeReady = function () {
+        var overlayFrame = Array.from(document.querySelectorAll('iframe')).slice(-1)[0];
+        var overlayFrameWindow = overlayFrame.contentWindow;
+        var oldUpdateContent = overlayFrameWindow.updateContent;
+        overlayFrameWindow.updateContent = function (errorOverlayProps) {
+            oldUpdateContent(errorOverlayProps);
+            var errorOverlayHTML = "\n            <div class=\"error-overlay\">\n                <div class=\"error-message\">" + error.message + "</div>\n            </div>\n        ";
+            overlayFrameWindow.document.body.insertAdjacentHTML('beforeend', errorOverlayHTML);
+            return true;
+        };
+        oldIframeReady();
+    };
+}
+exports.default = reactErrorOverlay;
 
 
 /***/ })
