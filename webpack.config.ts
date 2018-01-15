@@ -14,10 +14,12 @@ interface INamespacedEntryPoints {
 type IEntryPoints = IBaseEntryPoints &
   INamespacedEntryPoints & { [key: string]: webpack.Entry };
 
-const paths = {
-  SRC: path.join(__dirname, 'src'),
-  DIST: path.join(__dirname, 'dist')
-};
+const enum Paths {
+  SRC = 'src',
+  COMMON_JS = 'lib',
+  ES_MODULE = 'es',
+  UMD = 'umd'
+}
 
 const baseConfig: Partial<webpack.Configuration> = {
   devtool: 'source-map',
@@ -55,29 +57,77 @@ const baseConfig: Partial<webpack.Configuration> = {
   }
 };
 
-const ENTRY_POINTS: IEntryPoints = {
+function buildEntryPoints(): IEntryPoints[] {}
+
+const MADCAP_ENTRY_POINTS: IEntryPoints = {
   base: {
-    core: path.join(paths.SRC, 'madcap'),
-    errors: path.join(paths.SRC, 'errors', 'index'),
-    handlers: path.join(paths.SRC, 'handlers', 'index'),
-    reporters: path.join(paths.SRC, 'reporters', 'index')
+    core: path.join(__dirname, 'packages', 'madcap', Paths.SRC, 'madcap'),
+    errors: path.join(
+      __dirname,
+      'packages',
+      'madcap',
+      Paths.SRC,
+      'errors',
+      'index'
+    ),
+    handlers: path.join(
+      __dirname,
+      'packages',
+      'madcap',
+      Paths.SRC,
+      'handlers',
+      'index'
+    ),
+    reporters: path.join(
+      __dirname,
+      'packages',
+      'madcap',
+      Paths.SRC,
+      'reporters',
+      'index'
+    )
   },
   errors: {
-    AssetLoadError: path.join(paths.SRC, 'errors', 'AssetLoadError'),
-    FetchError: path.join(paths.SRC, 'errors', 'FetchError'),
-    FontLoadError: path.join(paths.SRC, 'errors', 'FontLoadError'),
-    ImageLoadError: path.join(paths.SRC, 'errors', 'ImageLoadError'),
-    StylesheetLoadError: path.join(paths.SRC, 'errors', 'StylesheetLoadError'),
-    ScriptLoadError: path.join(paths.SRC, 'errors', 'ScriptLoadError'),
-    UiComponentError: path.join(paths.SRC, 'errors', 'UiComponentError')
+    AssetLoadError: path.join(__dirname, Paths.SRC, 'errors', 'AssetLoadError'),
+    FetchError: path.join(__dirname, Paths.SRC, 'errors', 'FetchError'),
+    FontLoadError: path.join(__dirname, Paths.SRC, 'errors', 'FontLoadError'),
+    ImageLoadError: path.join(__dirname, Paths.SRC, 'errors', 'ImageLoadError'),
+    StylesheetLoadError: path.join(
+      __dirname,
+      Paths.SRC,
+      'errors',
+      'StylesheetLoadError'
+    ),
+    ScriptLoadError: path.join(
+      __dirname,
+      Paths.SRC,
+      'errors',
+      'ScriptLoadError'
+    ),
+    UiComponentError: path.join(
+      __dirname,
+      Paths.SRC,
+      'errors',
+      'UiComponentError'
+    )
   },
   handlers: {
-    retryThenRecover: path.join(paths.SRC, 'handlers', 'retryThenRecover')
+    retryThenRecover: path.join(
+      __dirname,
+      Paths.SRC,
+      'handlers',
+      'retryThenRecover'
+    )
   },
   reporters: {
-    errorOverlay: path.join(paths.SRC, 'reporters', 'errorOverlay'),
-    reactErrorOverlay: path.join(paths.SRC, 'reporters', 'reactErrorOverlay'),
-    console: path.join(paths.SRC, 'reporters', 'console')
+    errorOverlay: path.join(__dirname, Paths.SRC, 'reporters', 'errorOverlay'),
+    reactErrorOverlay: path.join(
+      __dirname,
+      Paths.SRC,
+      'reporters',
+      'reactErrorOverlay'
+    ),
+    console: path.join(__dirname, Paths.SRC, 'reporters', 'console')
   }
 };
 
@@ -86,7 +136,7 @@ function buildOutputConfig(
   env: any
 ): webpack.Output {
   return {
-    path: paths.DIST,
+    path: Paths.UMD,
     filename: 'madcap.[name].' + (env.min ? 'min.' : '') + 'js',
     library: ['Madcap', namespace, '[name]'].filter(i => i) as string[],
     libraryTarget: 'umd'
@@ -105,7 +155,7 @@ function buildConfig(
   };
 }
 
-const { base: baseEntryPoints, ...namespacedEntryPoints } = ENTRY_POINTS;
+const { base: baseEntryPoints, ...namespacedEntryPoints } = MADCAP_ENTRY_POINTS;
 
 const namespaces = Object.keys(namespacedEntryPoints);
 
@@ -113,9 +163,9 @@ module.exports = (env: webpack.Configuration = {}): webpack.Configuration[] => {
   return [
     buildConfig(baseEntryPoints, 'base', env),
     buildConfig(baseEntryPoints, 'base', { ...env, min: true }),
-    ...namespaces.map(ns => buildConfig(ENTRY_POINTS[ns], ns, env)),
+    ...namespaces.map(ns => buildConfig(MADCAP_ENTRY_POINTS[ns], ns, env)),
     ...namespaces.map(ns =>
-      buildConfig(ENTRY_POINTS[ns], ns, { ...env, min: true })
+      buildConfig(MADCAP_ENTRY_POINTS[ns], ns, { ...env, min: true })
     )
   ];
 };

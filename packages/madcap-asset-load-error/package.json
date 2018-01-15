@@ -1,0 +1,20 @@
+{
+  "name": "madcap-asset-load-error",
+  "version": "0.1.0",
+  "description": "Madcap Error subclasses for asset load failures",
+  "main": "lib/index.js",
+  "module": "es/index.js",
+  "types": "lib/index.d.ts",
+  "repository": "johnloy/madcap",
+  "author": "John Loy",
+  "license": "MIT",
+  "private": false,
+  "files": [
+    "LICENSE",
+    "CHANGELOG.md",
+    "README.md",
+    "umd",
+    "lib",
+    "es"
+  ]
+}

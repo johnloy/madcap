@@ -3,8 +3,7 @@ import ReactDOM from 'react-dom';
 import './index.css';
 import App from './App';
 import registerServiceWorker from './registerServiceWorker';
-import { attempt } from './error-strategy';
-import createError from 'madcap/es/createError';
+import { attempt, DemoError } from './error-strategy';
 
 /**
  * Toggle production-like behaviors
@@ -35,12 +34,6 @@ window.__DEBUG__ = window.__DEVELOPMENT__ || window.__STAGING__;
 
 const demoNumberMatch = window.location.search.match(/demo=(\d+)/);
 const demoNumber = demoNumberMatch ? parseInt(demoNumberMatch[1], 10) : null;
-
-const DemoError = createError('DemoError', Error, {
-  message: ({ order, where }) => `(${order}) ${where}`,
-  order: 0,
-  where: ''
-});
 
 function doSomethingAsync(attempt) {
   if (demoNumber === 4) {

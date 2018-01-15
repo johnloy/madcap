@@ -1,0 +1,24 @@
+{
+  "name": "madcap",
+  "version": "0.1.0",
+  "description": "A crazy useful JS error handling toolkit",
+  "main": "lib/index.js",
+  "module": "es/index.js",
+  "types": "lib/index.d.ts",
+  "repository": "johnloy/madcap",
+  "author": "John Loy <loy.john@gmail.com>",
+  "license": "MIT",
+  "private": false,
+  "dependencies": {
+    "@types/stacktrace-js": "^0.0.32",
+    "stacktrace-js": "^2.0.0"
+  },
+  "files": [
+    "LICENSE",
+    "CHANGELOG.md",
+    "README.md",
+    "umd",
+    "lib",
+    "es"
+  ]
+}

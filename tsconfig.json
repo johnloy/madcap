@@ -2,7 +2,7 @@
   "compileOnSave": true,
   "compilerOptions": {
     "baseUrl": "./src",
-    "lib": [ "es2016", "dom" ],
+    "lib": ["es2016", "dom"],
     "moduleResolution": "node",
     "module": "commonjs",
     "noImplicitAny": true,
@@ -12,7 +12,5 @@
     "target": "es2015",
     "forceConsistentCasingInFileNames": true
   },
-  "include": [
-      "src/**/*"
-  ]
+  "include": ["src/**/*"]
 }
