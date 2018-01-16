@@ -1,4 +1,4 @@
-import { MadcapError } from 'madcap.d';
+import { MadcapError } from 'madcap';
 
 interface IErrorOverlayProps {
   currentBuildError: any;

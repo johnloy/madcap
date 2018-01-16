@@ -1,9 +1,34 @@
-import {
-  CustomError,
-  CustomErrorProps,
-  MadcapError,
-  MessageBuilder
-} from 'madcap.d';
+import { AttemptFunction, Attempt, Retry } from '../index';
+
+export interface MadcapError extends Error {
+  trace?: StackTrace.StackFrame[];
+  fileName: string;
+  lineNumber: number;
+  columnNumber: number;
+  attemptFn: AttemptFunction;
+  attempts: Attempt[];
+  readonly retries: Retry[];
+  retry?: (error: MadcapError) => any;
+  recover?: (error: MadcapError) => any;
+  [key: string]: any;
+}
+
+export interface MessageBuilder {
+  (props: {}): string;
+}
+
+export interface CustomErrorProps {
+  [key: string]: any;
+}
+
+export interface CustomError {
+  new (
+    message?: MessageBuilder | string | CustomErrorProps,
+    props?: CustomErrorProps
+  ): Partial<MadcapError>;
+  __proto__?: {};
+  configure?: (config: {}) => void;
+}
 
 function arePropsValid(props: any): props is CustomErrorProps {
   return (
@@ -20,7 +45,7 @@ function validateMessage(props: CustomErrorProps | {}) {
   return true;
 }
 
-function createError(
+export function createError(
   name: string,
   ParentError = Error,
   defaultProps: CustomErrorProps = {}
@@ -134,5 +159,3 @@ function createError(
 
   return CustomError as CustomError;
 }
-
-export default createError;

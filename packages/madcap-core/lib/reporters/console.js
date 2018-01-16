@@ -27,5 +27,5 @@ function reportToConsole(error) {
         console.log(`Attempts:\n\n${attemptsReportStr}`, ...attemptsReportLogValues);
     }
 }
-exports.default = reportToConsole;
+exports.reportToConsole = reportToConsole;
 //# sourceMappingURL=console.js.map

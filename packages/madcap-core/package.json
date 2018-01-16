@@ -4,7 +4,7 @@
   "description": "A crazy useful JS error handling toolkit",
   "main": "lib/index.js",
   "module": "es/index.js",
-  "types": "lib/index.d.ts",
+  "types": "index.d.ts",
   "repository": "johnloy/madcap",
   "author": "John Loy <loy.john@gmail.com>",
   "license": "MIT",

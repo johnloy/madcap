@@ -1,4 +1,4 @@
-import { MadcapError } from 'madcap.d';
+import { MadcapError } from '../lib/createError';
 
 declare var __DEBUG__: boolean;
 
@@ -9,7 +9,7 @@ class Attempt {
   }
 }
 
-function reportToConsole(error: MadcapError) {
+export function reportToConsole(error: MadcapError) {
   if (__DEBUG__) {
     console.group('%c%s', 'color: red', error.message);
     console.error(error);
@@ -42,5 +42,3 @@ function reportToConsole(error: MadcapError) {
     );
   }
 }
-
-export default reportToConsole;

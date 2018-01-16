@@ -3,7 +3,7 @@ class Attempt {
         this.location = '';
     }
 }
-function reportToConsole(error) {
+export function reportToConsole(error) {
     if (__DEBUG__) {
         console.group('%c%s', 'color: red', error.message);
         console.error(error);
@@ -25,5 +25,4 @@ function reportToConsole(error) {
         console.log(`Attempts:\n\n${attemptsReportStr}`, ...attemptsReportLogValues);
     }
 }
-export default reportToConsole;
 //# sourceMappingURL=console.js.map

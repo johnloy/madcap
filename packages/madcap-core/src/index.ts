@@ -1,20 +1,93 @@
-import {
-  Attempt,
-  AttemptFunction,
-  AttemptName,
-  AttemptsMap,
-  AttemptFactory,
-  BrowserApi,
-  Config,
-  CoreApi,
-  MadcapError,
-  Strategy,
-  ErrorHandler,
-  StrategyMap
-} from 'madcap.d';
 import * as StackTrace from 'stacktrace-js';
-import createError from './createError';
-import reportToConsole from './reporters/console';
+import { MadcapError, createError } from './lib/createError';
+import { reportToConsole } from './reporters/console';
+
+export interface BrowserApi {
+  configure(newConfig: Partial<Config>): Config;
+  attempt(
+    name: AttemptName,
+    fn: AttemptFunction,
+    pastAttempts?: Attempt[]
+  ): Promise<any>;
+}
+
+export interface CoreApi extends BrowserApi {
+  core?: CoreApi | BrowserApi;
+  prepareError(
+    error: MadcapError,
+    stackFrames?: StackTrace.StackFrame[]
+  ): MadcapError;
+
+  cleanStack(
+    stackFrame: StackTrace.StackFrame,
+    index?: number,
+    stackFrames?: StackTrace.StackFrame[],
+    removeFirst?: boolean
+  ): boolean;
+
+  config: Partial<Config>;
+}
+
+export declare type AttemptName = string;
+
+export declare type Attempt = {
+  name: AttemptName;
+  function: AttemptFunction;
+  stackFrames: StackTrace.StackFrame[];
+  context: any;
+};
+
+export interface Retry {
+  count: number;
+  returnValue: any;
+  error?: MadcapError;
+}
+
+export interface AttemptFactory {
+  (name: AttemptName, fn: AttemptFunction, pastAttempts?: Attempt[]): Promise<
+    any
+  >;
+  (
+    name: AttemptName,
+    context: any,
+    fn: AttemptFunction,
+    pastAttempts?: Attempt[]
+  ): Promise<any>;
+  (
+    name: AttemptName,
+    contextOrFn?: any,
+    fnOrPastAttempts?: Attempt[] | AttemptFunction,
+    pastAttempts?: Attempt[]
+  ): Promise<any>;
+}
+
+export interface AttemptFunction {
+  (attemptFactory: AttemptFactory): any;
+}
+
+export interface Config {
+  report: (error: MadcapError) => void | StrategyMap;
+  handle: (error: MadcapError) => void | StrategyMap;
+  allowUndefinedAttempts?: boolean;
+  stackTraceLimit?: number;
+}
+
+export type AttemptsMap = Map<AttemptFunction, Attempt[]>;
+
+export type StrategyMap =
+  | Map<Partial<MadcapError>, ErrorHandler>
+  | [[Partial<MadcapError>, ErrorHandler]];
+
+export interface ErrorHandler {
+  (error: Error): void;
+}
+
+export interface Strategy extends ErrorHandler {
+  __default__?: ErrorHandler;
+  add?: (constr: Error, strategy: ErrorHandler) => void;
+  remove?: (constr: Error, strategy: ErrorHandler) => void;
+  setDefault?: (strategy: ErrorHandler) => ErrorHandler;
+}
 
 const UndefinedAttemptError = createError('UndefinedAttempError', Error, {
   attemptName: '',
@@ -27,7 +100,7 @@ function warnToConfigureHandle(): void {
   console.warn('You need to configure a handler');
 }
 
-export default function Madcap(initConfig: Config): CoreApi | Partial<CoreApi> {
+function Madcap(initConfig: Config): CoreApi | Partial<CoreApi> {
   /*
    * A Map instance with shape Map<AttemptFunction, Attempt[]>, held in the
    * Madcap function closure, that stores attempt data. This data supplies
@@ -348,3 +421,5 @@ export default function Madcap(initConfig: Config): CoreApi | Partial<CoreApi> {
 
   return api;
 }
+
+export default Madcap;

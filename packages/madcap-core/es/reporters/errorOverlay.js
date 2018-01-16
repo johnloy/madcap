@@ -1,2 +1,2 @@
-export default function () { }
+export function errorOverlay() { }
 //# sourceMappingURL=errorOverlay.js.map

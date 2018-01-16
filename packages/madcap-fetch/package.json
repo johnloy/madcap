@@ -4,11 +4,14 @@
   "description": "Madcap fetch wrapper and FetchError constructor",
   "main": "lib/index.js",
   "module": "es/index.js",
-  "types": "lib/index.d.ts",
+  "types": "index.d.ts",
   "repository": "johnloy/madcap",
   "author": "John Loy",
   "license": "MIT",
   "private": false,
+  "dependencies": {
+    "madcap": "^0.1.0"
+  },
   "files": [
     "LICENSE",
     "CHANGELOG.md",

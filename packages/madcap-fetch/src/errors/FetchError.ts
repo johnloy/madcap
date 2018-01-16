@@ -1,5 +1,4 @@
-import { MadcapError, AttemptFactory } from 'madcap.d';
-import createError from '../createError';
+import { MadcapError, AttemptFactory, createError } from 'madcap';
 
 type Milliseconds = number | string; // 300 | 300ms
 type Seconds = string; // .5s

@@ -1,16 +1,14 @@
 {
   "compileOnSave": true,
   "compilerOptions": {
-    "baseUrl": "./src",
     "lib": ["es2016", "dom"],
     "moduleResolution": "node",
     "module": "commonjs",
     "noImplicitAny": true,
-    "outDir": "./lib",
+    "listEmittedFiles": true,
     "sourceMap": true,
     "strictNullChecks": true,
     "target": "es2015",
     "forceConsistentCasingInFileNames": true
-  },
-  "include": ["src/**/*"]
+  }
 }
