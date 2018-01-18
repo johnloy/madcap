@@ -70,7 +70,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 5);
+/******/ 	return __webpack_require__(__webpack_require__.s = 8);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -630,7 +630,7 @@ var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_
 var base64VLQ = __webpack_require__(3);
 var util = __webpack_require__(0);
 var ArraySet = __webpack_require__(4).ArraySet;
-var MappingList = __webpack_require__(12).MappingList;
+var MappingList = __webpack_require__(15).MappingList;
 
 /**
  * An instance of the SourceMapGenerator represents a source map which is
@@ -1067,7 +1067,7 @@ exports.SourceMapGenerator = SourceMapGenerator;
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-var base64 = __webpack_require__(11);
+var base64 = __webpack_require__(14);
 
 // A single base 64 digit can contain 6 bits of data. For the base 64 variable
 // length quantities we use in the source map spec, the first bit is the sign,
@@ -1288,6 +1288,170 @@ exports.ArraySet = ArraySet;
 
 "use strict";
 
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) if (e.indexOf(p[i]) < 0)
+            t[p[i]] = s[p[i]];
+    return t;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+function arePropsValid(props) {
+    return (typeof props.message === 'string' || typeof props.message === 'function');
+}
+function validateMessage(props) {
+    if (!arePropsValid(props)) {
+        throw new TypeError('message either needs to be a string or a function that returns a string');
+    }
+    return true;
+}
+function createError(name, ParentError, defaultProps) {
+    if (ParentError === void 0) { ParentError = Error; }
+    if (defaultProps === void 0) { defaultProps = {}; }
+    if (typeof name !== 'string') {
+        throw new TypeError('expected "name" to be a string.');
+    }
+    if (ParentError !== Error &&
+        !Error.prototype.isPrototypeOf(ParentError.prototype)) {
+        throw new TypeError('expected "ParentError" to extend Error or a subclass of Error');
+    }
+    validateMessage(defaultProps);
+    var _a = defaultProps, defaultMessage = _a.message, restDefaultProps = __rest(_a, ["message"]);
+    var getMessage = typeof defaultMessage === 'string' ? function () { return defaultMessage; } : defaultMessage;
+    var CustomError = function (message, props) {
+        if (!(this instanceof CustomError)) {
+            return new CustomError(message, props);
+        }
+        if (arguments.length === 1) {
+            props = message;
+            message = props.message;
+        }
+        var proxy = new ParentError();
+        Object.setPrototypeOf(proxy, Object.getPrototypeOf(this));
+        if (Error.captureStackTrace) {
+            Error.captureStackTrace(proxy, CustomError);
+        }
+        Object.assign(proxy, props);
+        proxy.name = name;
+        proxy.message =
+            typeof message === 'function'
+                ? message(proxy)
+                : message || getMessage(proxy);
+        return proxy;
+    };
+    if (Object.setPrototypeOf) {
+        Object.setPrototypeOf(CustomError, ParentError);
+    }
+    else {
+        CustomError.__proto__ = ParentError;
+    }
+    Object.defineProperty(CustomError, 'name', {
+        value: name,
+        enumerable: false,
+        configurable: true,
+        writable: false
+    });
+    CustomError.configure = function (config) {
+        validateMessage(config);
+        if (typeof config.message !== 'string' &&
+            typeof config.message !== 'function') {
+            throw new TypeError('message either needs to be a string or a function that returns a string');
+        }
+        else {
+            getMessage =
+                typeof config.message === 'string'
+                    ? function () { return config.message; }
+                    : config.message;
+        }
+        var message = config.message, configRest = __rest(config, ["message"]);
+        Object.assign(CustomError.prototype, configRest);
+    };
+    CustomError.prototype = Object.create(ParentError.prototype, {
+        constructor: {
+            value: CustomError,
+            enumerable: false,
+            configurable: true,
+            writable: true
+        },
+        toString: {
+            value: function () {
+                return 'foo';
+            },
+            enumerable: false,
+            configurable: true,
+            writable: true
+        }
+    });
+    Object.assign(CustomError.prototype, restDefaultProps);
+    return CustomError;
+}
+exports.createError = createError;
+
+
+/***/ }),
+/* 6 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+var Attempt = /** @class */ (function () {
+    function Attempt(fn) {
+        this.location = '';
+    }
+    return Attempt;
+}());
+function consoleReporter(error) {
+    if (__DEBUG__) {
+        console.group('%c%s', 'color: red', error.message);
+        console.error(error);
+        console.log("Location: " + error.fileName + ":" + error.lineNumber + ":" + error.columnNumber + "\n");
+        if (error.attempts) {
+            var attemptsReportStr = error.attempts.reduce(function (report, attempt, index) {
+                report += '%d)    Name: %s\n';
+                report += '   Context: %O\n';
+                report += "  Function: %O\n";
+                report += '\n';
+                return report;
+            }, '');
+            var attemptsReportLogValues = error.attempts.reduce(function (report, attempt, index) {
+                report.push(index + 1);
+                report.push(attempt.name);
+                report.push(attempt.context || 'none provided');
+                report.push(new Attempt(attempt.function));
+                return report;
+            }, []);
+            console.log.apply(console, ["Attempts:\n\n" + attemptsReportStr].concat(attemptsReportLogValues));
+        }
+    }
+    return error;
+}
+exports.consoleReporter = consoleReporter;
+
+
+/***/ }),
+/* 7 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+function retryThenRecover(error /*, retry, retryTimes, recover*/) {
+    console.log(error);
+    // if (error.retry && error.retriedCount) {
+    // }
+}
+exports.retryThenRecover = retryThenRecover;
+
+
+/***/ }),
+/* 8 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
@@ -1324,18 +1488,29 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-var StackTrace = __webpack_require__(6);
-var createError_1 = __webpack_require__(17);
-var console_1 = __webpack_require__(18);
-var UndefinedAttemptError = createError_1.createError('UndefinedAttempError', Error, {
-    attemptName: '',
-    message: function (e) {
-        return "Attempt \"" + e.attemptName + "\" failed because undefined was returned";
-    }
-});
+var StackTrace = __webpack_require__(9);
+var createError_1 = __webpack_require__(5);
+exports.createError = createError_1.createError;
+var reporters_1 = __webpack_require__(20);
+var handlers_1 = __webpack_require__(22);
+var UndefinedAttemptError_1 = __webpack_require__(23);
+var strategy_1 = __webpack_require__(24);
+exports.createReportStrategy = strategy_1.createReportStrategy;
+exports.createHandleStrategy = strategy_1.createHandleStrategy;
 function warnToConfigureHandle() {
     console.warn('You need to configure a handler');
 }
+function isAttemptFunction(a) {
+    return typeof a === 'function';
+}
+function cleanStack(stackFrame, index, stackFrames, removeFirst) {
+    var isAttemptFn = stackFrame.functionName && stackFrame.functionName.endsWith('attempt');
+    if (removeFirst) {
+        return index !== 0 && !isAttemptFn;
+    }
+    return index === 0 || !isAttemptFn;
+}
+var cleanAttemptStack = function (stackFrame, index, stackFrames) { return cleanStack(stackFrame, index, stackFrames, true); };
 function Madcap(initConfig) {
     /*
      * A Map instance with shape Map<AttemptFunction, Attempt[]>, held in the
@@ -1344,22 +1519,19 @@ function Madcap(initConfig) {
      */
     var attemptsMap = new Map();
     var config = {
-        report: console_1.reportToConsole,
+        report: reporters_1.consoleReporter,
         handle: warnToConfigureHandle,
         allowUndefinedAttempts: false
     };
     if (typeof initConfig === 'object') {
         configure(initConfig);
     }
-    function isStrategyMap(strategy) {
-        return strategy && (Array.isArray(strategy) || strategy instanceof Map);
-    }
     function configure(mergeConfig) {
-        if (isStrategyMap(mergeConfig.report)) {
-            mergeConfig.report = createReportStrategy(mergeConfig.report);
+        if (strategy_1.isStrategyMap(mergeConfig.report)) {
+            mergeConfig.report = strategy_1.createReportStrategy(mergeConfig.report);
         }
-        if (isStrategyMap(mergeConfig.handle)) {
-            mergeConfig.handle = createHandleStrategy(mergeConfig.handle);
+        if (strategy_1.isStrategyMap(mergeConfig.handle)) {
+            mergeConfig.handle = strategy_1.createHandleStrategy(mergeConfig.handle);
         }
         Object.assign(config, mergeConfig);
         // By default, v8 includes the 10 topmost stack frames
@@ -1401,17 +1573,6 @@ function Madcap(initConfig) {
         error.lineNumber = topFrame.lineNumber;
         error.columnNumber = topFrame.columnNumber;
         return error;
-    }
-    function cleanStack(stackFrame, index, stackFrames, removeFirst) {
-        var isAttemptFn = stackFrame.functionName && stackFrame.functionName.endsWith('attempt');
-        if (removeFirst) {
-            return index !== 0 && !isAttemptFn;
-        }
-        return index === 0 || !isAttemptFn;
-    }
-    var cleanAttemptStack = function (stackFrame, index, stackFrames) { return cleanStack(stackFrame, index, stackFrames, true); };
-    function isAttemptFunction(a) {
-        return typeof a === 'function';
     }
     function attempt(name, contextOrFn, fnOrPastAttempts, pastAttempts) {
         return __awaiter(this, void 0, void 0, function () {
@@ -1483,8 +1644,9 @@ function Madcap(initConfig) {
                             ret = fn(subattempt);
                             if (ret === undefined) {
                                 if (!config.allowUndefinedAttempts) {
-                                    throw new UndefinedAttemptError({ attemptName: name });
+                                    throw new UndefinedAttemptError_1.UndefinedAttemptError({ attemptName: name });
                                 }
+                                // Just nag instead. No throwing nonsense.
                                 console.warn("Attempt " + name + " returns undefined. Is it a work in progress?");
                             }
                             return [2 /*return*/, ret];
@@ -1497,69 +1659,7 @@ function Madcap(initConfig) {
             });
         });
     }
-    function retryThenRecover(error /*, retry, retryTimes, recover*/) {
-        console.log(error);
-        // if (error.retry && error.retriedCount) {
-        // }
-    }
-    function createStrategy(strategyDef) {
-        var strategyMap = new Map(strategyDef);
-        var strategy = function (error) {
-            var resolvedStrategy;
-            var match = Array.from(strategyMap.keys()).find(function (constr) { return error instanceof constr; });
-            if (match) {
-                resolvedStrategy = strategyMap.get(match);
-            }
-            else {
-                if (!strategy.__default__)
-                    return;
-                resolvedStrategy = strategy.__default__;
-            }
-            resolvedStrategy(error);
-        };
-        strategy.add = function (constr, handler) {
-            return strategyMap.set(constr, handler);
-        };
-        strategy.remove = function (constr, handler) {
-            return strategyMap.delete(constr);
-        };
-        strategy.setDefault = function (handler) {
-            strategy.__default__ = handler;
-            return handler;
-        };
-        return strategy;
-    }
-    function createReportStrategy(strategyDef) {
-        var strategy = createStrategy(strategyDef);
-        strategy.setDefault(console_1.reportToConsole);
-        return strategy;
-    }
-    function createHandleStrategy(strategyDef) {
-        var strategy = createStrategy(strategyDef);
-        strategy.setDefault(retryThenRecover);
-        return strategy;
-    }
-    var api = {
-        attempt: attempt,
-        configure: configure,
-        createError: createError_1.createError,
-        createReportStrategy: createReportStrategy,
-        createHandleStrategy: createHandleStrategy
-    };
-    // if (typeof window !== 'undefined') {
-    //   Object.assign(api, { cleanStack, prepareError, config });
-    // }
     if (typeof window !== 'undefined') {
-        // const coreApi = init();
-        // const {
-        //   cleanStack,
-        //   prepareError,
-        //   config,
-        //   ...browserApi
-        // } = coreApi as CoreApi;
-        // Madcap = browserApi;
-        // Madcap = browserApi.configure;
-        // Object.assign(Madcap, browserApi);
         window.onerror = function (msg, url, line, col, error) {
             if (error && !error.attempts) {
                 error.isHandled = true;
@@ -1582,13 +1682,26 @@ function Madcap(initConfig) {
                 .then(config.handle.bind(null, error));
         });
     }
-    return api;
+    // Public Madcap strategy API
+    return {
+        attempt: attempt,
+        configure: configure
+    };
 }
 exports.default = Madcap;
+var reporters = {
+    consoleReporter: reporters_1.consoleReporter
+};
+exports.reporters = reporters;
+var handlers = {
+    retryThenRecover: handlers_1.retryThenRecover
+};
+exports.handlers = handlers;
+var errors = {};
 
 
 /***/ }),
-/* 6 */
+/* 9 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;(function(root, factory) {
@@ -1597,7 +1710,7 @@ var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_
 
     /* istanbul ignore next */
     if (true) {
-        !(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(7), __webpack_require__(8), __webpack_require__(9)], __WEBPACK_AMD_DEFINE_FACTORY__ = (factory),
+        !(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(10), __webpack_require__(11), __webpack_require__(12)], __WEBPACK_AMD_DEFINE_FACTORY__ = (factory),
 				__WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ?
 				(__WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__)) : __WEBPACK_AMD_DEFINE_FACTORY__),
 				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
@@ -1824,7 +1937,7 @@ var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_
 
 
 /***/ }),
-/* 7 */
+/* 10 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;(function(root, factory) {
@@ -2024,7 +2137,7 @@ var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_
 
 
 /***/ }),
-/* 8 */
+/* 11 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;(function(root, factory) {
@@ -2078,7 +2191,7 @@ var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_
 
 
 /***/ }),
-/* 9 */
+/* 12 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;(function(root, factory) {
@@ -2087,7 +2200,7 @@ var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_
 
     /* istanbul ignore next */
     if (true) {
-        !(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(10), __webpack_require__(1)], __WEBPACK_AMD_DEFINE_FACTORY__ = (factory),
+        !(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(13), __webpack_require__(1)], __WEBPACK_AMD_DEFINE_FACTORY__ = (factory),
 				__WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ?
 				(__WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__)) : __WEBPACK_AMD_DEFINE_FACTORY__),
 				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
@@ -2427,7 +2540,7 @@ var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_
 
 
 /***/ }),
-/* 10 */
+/* 13 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -2436,12 +2549,12 @@ var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_
  * http://opensource.org/licenses/BSD-3-Clause
  */
 exports.SourceMapGenerator = __webpack_require__(2).SourceMapGenerator;
-exports.SourceMapConsumer = __webpack_require__(13).SourceMapConsumer;
-exports.SourceNode = __webpack_require__(16).SourceNode;
+exports.SourceMapConsumer = __webpack_require__(16).SourceMapConsumer;
+exports.SourceNode = __webpack_require__(19).SourceNode;
 
 
 /***/ }),
-/* 11 */
+/* 14 */
 /***/ (function(module, exports) {
 
 /* -*- Mode: js; js-indent-level: 2; -*- */
@@ -2514,7 +2627,7 @@ exports.decode = function (charCode) {
 
 
 /***/ }),
-/* 12 */
+/* 15 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* -*- Mode: js; js-indent-level: 2; -*- */
@@ -2599,7 +2712,7 @@ exports.MappingList = MappingList;
 
 
 /***/ }),
-/* 13 */
+/* 16 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* -*- Mode: js; js-indent-level: 2; -*- */
@@ -2610,10 +2723,10 @@ exports.MappingList = MappingList;
  */
 
 var util = __webpack_require__(0);
-var binarySearch = __webpack_require__(14);
+var binarySearch = __webpack_require__(17);
 var ArraySet = __webpack_require__(4).ArraySet;
 var base64VLQ = __webpack_require__(3);
-var quickSort = __webpack_require__(15).quickSort;
+var quickSort = __webpack_require__(18).quickSort;
 
 function SourceMapConsumer(aSourceMap) {
   var sourceMap = aSourceMap;
@@ -3687,7 +3800,7 @@ exports.IndexedSourceMapConsumer = IndexedSourceMapConsumer;
 
 
 /***/ }),
-/* 14 */
+/* 17 */
 /***/ (function(module, exports) {
 
 /* -*- Mode: js; js-indent-level: 2; -*- */
@@ -3804,7 +3917,7 @@ exports.search = function search(aNeedle, aHaystack, aCompare, aBias) {
 
 
 /***/ }),
-/* 15 */
+/* 18 */
 /***/ (function(module, exports) {
 
 /* -*- Mode: js; js-indent-level: 2; -*- */
@@ -3924,7 +4037,7 @@ exports.quickSort = function (ary, comparator) {
 
 
 /***/ }),
-/* 16 */
+/* 19 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* -*- Mode: js; js-indent-level: 2; -*- */
@@ -4337,149 +4450,112 @@ exports.SourceNode = SourceNode;
 
 
 /***/ }),
-/* 17 */
+/* 20 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
-var __rest = (this && this.__rest) || function (s, e) {
-    var t = {};
-    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
-        t[p] = s[p];
-    if (s != null && typeof Object.getOwnPropertySymbols === "function")
-        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) if (e.indexOf(p[i]) < 0)
-            t[p[i]] = s[p[i]];
-    return t;
-};
+function __export(m) {
+    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
+}
 Object.defineProperty(exports, "__esModule", { value: true });
-function arePropsValid(props) {
-    return (typeof props.message === 'string' || typeof props.message === 'function');
-}
-function validateMessage(props) {
-    if (!arePropsValid(props)) {
-        throw new TypeError('message either needs to be a string or a function that returns a string');
-    }
-    return true;
-}
-function createError(name, ParentError, defaultProps) {
-    if (ParentError === void 0) { ParentError = Error; }
-    if (defaultProps === void 0) { defaultProps = {}; }
-    if (typeof name !== 'string') {
-        throw new TypeError('expected "name" to be a string.');
-    }
-    if (ParentError !== Error &&
-        !Error.prototype.isPrototypeOf(ParentError.prototype)) {
-        throw new TypeError('expected "ParentError" to extend Error or a subclass of Error');
-    }
-    validateMessage(defaultProps);
-    var _a = defaultProps, defaultMessage = _a.message, restDefaultProps = __rest(_a, ["message"]);
-    var getMessage = typeof defaultMessage === 'string' ? function () { return defaultMessage; } : defaultMessage;
-    var CustomError = function (message, props) {
-        if (!(this instanceof CustomError)) {
-            return new CustomError(message, props);
-        }
-        if (arguments.length === 1) {
-            props = message;
-            message = props.message;
-        }
-        var proxy = new ParentError();
-        Object.setPrototypeOf(proxy, Object.getPrototypeOf(this));
-        if (Error.captureStackTrace) {
-            Error.captureStackTrace(proxy, CustomError);
-        }
-        Object.assign(proxy, props);
-        proxy.name = name;
-        proxy.message =
-            typeof message === 'function'
-                ? message(proxy)
-                : message || getMessage(proxy);
-        return proxy;
-    };
-    if (Object.setPrototypeOf) {
-        Object.setPrototypeOf(CustomError, ParentError);
-    }
-    else {
-        CustomError.__proto__ = ParentError;
-    }
-    Object.defineProperty(CustomError, 'name', {
-        value: name,
-        enumerable: false,
-        configurable: true,
-        writable: false
-    });
-    CustomError.configure = function (config) {
-        validateMessage(config);
-        if (typeof config.message !== 'string' &&
-            typeof config.message !== 'function') {
-            throw new TypeError('message either needs to be a string or a function that returns a string');
-        }
-        else {
-            getMessage =
-                typeof config.message === 'string'
-                    ? function () { return config.message; }
-                    : config.message;
-        }
-        var message = config.message, configRest = __rest(config, ["message"]);
-        Object.assign(CustomError.prototype, configRest);
-    };
-    CustomError.prototype = Object.create(ParentError.prototype, {
-        constructor: {
-            value: CustomError,
-            enumerable: false,
-            configurable: true,
-            writable: true
-        },
-        toString: {
-            value: function () {
-                return 'foo';
-            },
-            enumerable: false,
-            configurable: true,
-            writable: true
-        }
-    });
-    Object.assign(CustomError.prototype, restDefaultProps);
-    return CustomError;
-}
-exports.createError = createError;
+__export(__webpack_require__(6));
+__export(__webpack_require__(21));
 
 
 /***/ }),
-/* 18 */
+/* 21 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var Attempt = /** @class */ (function () {
-    function Attempt(fn) {
-        this.location = '';
-    }
-    return Attempt;
-}());
-function reportToConsole(error) {
-    if (__DEBUG__) {
-        console.group('%c%s', 'color: red', error.message);
-        console.error(error);
-        console.log("Location: " + error.fileName + ":" + error.lineNumber + ":" + error.columnNumber + "\n");
-        var attemptsReportStr = error.attempts.reduce(function (report, attempt, index) {
-            report += '%d)    Name: %s\n';
-            report += '   Context: %O\n';
-            report += "  Function: %O\n";
-            report += '\n';
-            return report;
-        }, '');
-        var attemptsReportLogValues = error.attempts.reduce(function (report, attempt, index) {
-            report.push(index + 1);
-            report.push(attempt.name);
-            report.push(attempt.context || 'none provided');
-            report.push(new Attempt(attempt.function));
-            return report;
-        }, []);
-        console.log.apply(console, ["Attempts:\n\n" + attemptsReportStr].concat(attemptsReportLogValues));
-    }
+function errorOverlay() { }
+exports.errorOverlay = errorOverlay;
+
+
+/***/ }),
+/* 22 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+function __export(m) {
+    for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
 }
-exports.reportToConsole = reportToConsole;
+Object.defineProperty(exports, "__esModule", { value: true });
+__export(__webpack_require__(7));
+
+
+/***/ }),
+/* 23 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+var createError_1 = __webpack_require__(5);
+exports.UndefinedAttemptError = createError_1.createError('UndefinedAttempError', Error, {
+    attemptName: '',
+    message: function (e) {
+        return "Attempt \"" + e.attemptName + "\" failed because undefined was returned";
+    }
+});
+
+
+/***/ }),
+/* 24 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+var console_1 = __webpack_require__(6);
+var retryThenRecover_1 = __webpack_require__(7);
+function isStrategyMap(strategy) {
+    return strategy && (Array.isArray(strategy) || strategy instanceof Map);
+}
+exports.isStrategyMap = isStrategyMap;
+function createStrategy(strategyDef) {
+    var strategyMap = new Map(strategyDef);
+    var strategy = function (error) {
+        var resolvedStrategy;
+        var match = Array.from(strategyMap.keys()).find(function (constr) { return error instanceof constr; });
+        if (match) {
+            resolvedStrategy = strategyMap.get(match);
+        }
+        else {
+            if (!strategy.__default__)
+                return;
+            resolvedStrategy = strategy.__default__;
+        }
+        resolvedStrategy(error);
+    };
+    strategy.add = function (constr, handler) {
+        return strategyMap.set(constr, handler);
+    };
+    strategy.remove = function (constr, handler) {
+        return strategyMap.delete(constr);
+    };
+    strategy.setDefault = function (handler) {
+        strategy.__default__ = handler;
+        return handler;
+    };
+    return strategy;
+}
+exports.createStrategy = createStrategy;
+function createReportStrategy(strategyDef) {
+    var strategy = createStrategy(strategyDef);
+    strategy.setDefault(console_1.consoleReporter);
+    return strategy;
+}
+exports.createReportStrategy = createReportStrategy;
+function createHandleStrategy(strategyDef) {
+    var strategy = createStrategy(strategyDef);
+    strategy.setDefault(retryThenRecover_1.retryThenRecover);
+    return strategy;
+}
+exports.createHandleStrategy = createHandleStrategy;
 
 
 /***/ })

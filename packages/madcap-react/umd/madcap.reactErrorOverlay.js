@@ -96,7 +96,7 @@ function reactErrorOverlay(error) {
         oldIframeReady();
     };
 }
-exports.default = reactErrorOverlay;
+exports.reactErrorOverlay = reactErrorOverlay;
 
 
 /***/ })

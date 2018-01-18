@@ -117,7 +117,7 @@ function bootstrap(attempt) {
     });
   }
 
-  return attempt('async bootstrap step', async attempt => {
+  attempt('async bootstrap step', async attempt => {
     if (demoNumber === 3) {
       throw new DemoError({
         order: 3,
@@ -155,9 +155,7 @@ function bootstrap(attempt) {
       });
   });
 
-  ReactDOM.render(<App />, document.getElementById('root'));
-
-  // return true;
+  return ReactDOM.render(<App />, document.getElementById('root'));
 }
 
 if (demoNumber === 1) {

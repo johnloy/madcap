@@ -11,7 +11,7 @@ interface IOverlayFrame extends Window {
   updateContent(errorOverlayProps: IErrorOverlayProps): boolean;
 }
 
-function reactErrorOverlay(error: MadcapError) {
+export function reactErrorOverlay(error: MadcapError) {
   const oldIframeReady = (window as any).__REACT_ERROR_OVERLAY_GLOBAL_HOOK__
     .iframeReady;
   (window as any).__REACT_ERROR_OVERLAY_GLOBAL_HOOK__.iframeReady = function() {
@@ -39,5 +39,3 @@ function reactErrorOverlay(error: MadcapError) {
     oldIframeReady();
   };
 }
-
-export default reactErrorOverlay;

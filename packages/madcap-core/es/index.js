@@ -8,16 +8,24 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 import * as StackTrace from 'stacktrace-js';
 import { createError } from './lib/createError';
-import { reportToConsole } from './reporters/console';
-const UndefinedAttemptError = createError('UndefinedAttempError', Error, {
-    attemptName: '',
-    message: (e) => {
-        return `Attempt "${e.attemptName}" failed because undefined was returned`;
-    }
-});
+import { consoleReporter } from './reporters';
+import { retryThenRecover } from './handlers';
+import { UndefinedAttemptError } from './errors/UndefinedAttemptError';
+import { isStrategyMap, createReportStrategy, createHandleStrategy } from './lib/strategy';
 function warnToConfigureHandle() {
     console.warn('You need to configure a handler');
 }
+function isAttemptFunction(a) {
+    return typeof a === 'function';
+}
+function cleanStack(stackFrame, index, stackFrames, removeFirst) {
+    const isAttemptFn = stackFrame.functionName && stackFrame.functionName.endsWith('attempt');
+    if (removeFirst) {
+        return index !== 0 && !isAttemptFn;
+    }
+    return index === 0 || !isAttemptFn;
+}
+const cleanAttemptStack = (stackFrame, index, stackFrames) => cleanStack(stackFrame, index, stackFrames, true);
 function Madcap(initConfig) {
     /*
      * A Map instance with shape Map<AttemptFunction, Attempt[]>, held in the
@@ -26,15 +34,12 @@ function Madcap(initConfig) {
      */
     const attemptsMap = new Map();
     const config = {
-        report: reportToConsole,
+        report: consoleReporter,
         handle: warnToConfigureHandle,
         allowUndefinedAttempts: false
     };
     if (typeof initConfig === 'object') {
         configure(initConfig);
-    }
-    function isStrategyMap(strategy) {
-        return strategy && (Array.isArray(strategy) || strategy instanceof Map);
     }
     function configure(mergeConfig) {
         if (isStrategyMap(mergeConfig.report)) {
@@ -84,17 +89,6 @@ function Madcap(initConfig) {
         error.lineNumber = topFrame.lineNumber;
         error.columnNumber = topFrame.columnNumber;
         return error;
-    }
-    function cleanStack(stackFrame, index, stackFrames, removeFirst) {
-        const isAttemptFn = stackFrame.functionName && stackFrame.functionName.endsWith('attempt');
-        if (removeFirst) {
-            return index !== 0 && !isAttemptFn;
-        }
-        return index === 0 || !isAttemptFn;
-    }
-    const cleanAttemptStack = (stackFrame, index, stackFrames) => cleanStack(stackFrame, index, stackFrames, true);
-    function isAttemptFunction(a) {
-        return typeof a === 'function';
     }
     function attempt(name, contextOrFn, fnOrPastAttempts, pastAttempts) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -153,6 +147,7 @@ function Madcap(initConfig) {
                     if (!config.allowUndefinedAttempts) {
                         throw new UndefinedAttemptError({ attemptName: name });
                     }
+                    // Just nag instead. No throwing nonsense.
                     console.warn(`Attempt ${name} returns undefined. Is it a work in progress?`);
                 }
                 return ret;
@@ -162,65 +157,7 @@ function Madcap(initConfig) {
             }
         });
     }
-    function retryThenRecover(error /*, retry, retryTimes, recover*/) {
-        console.log(error);
-        // if (error.retry && error.retriedCount) {
-        // }
-    }
-    function createStrategy(strategyDef) {
-        const strategyMap = new Map(strategyDef);
-        const strategy = (error) => {
-            let resolvedStrategy;
-            const match = Array.from(strategyMap.keys()).find((constr) => error instanceof constr);
-            if (match) {
-                resolvedStrategy = strategyMap.get(match);
-            }
-            else {
-                if (!strategy.__default__)
-                    return;
-                resolvedStrategy = strategy.__default__;
-            }
-            resolvedStrategy(error);
-        };
-        strategy.add = (constr, handler) => strategyMap.set(constr, handler);
-        strategy.remove = (constr, handler) => strategyMap.delete(constr);
-        strategy.setDefault = (handler) => {
-            strategy.__default__ = handler;
-            return handler;
-        };
-        return strategy;
-    }
-    function createReportStrategy(strategyDef) {
-        const strategy = createStrategy(strategyDef);
-        strategy.setDefault(reportToConsole);
-        return strategy;
-    }
-    function createHandleStrategy(strategyDef) {
-        const strategy = createStrategy(strategyDef);
-        strategy.setDefault(retryThenRecover);
-        return strategy;
-    }
-    const api = {
-        attempt,
-        configure,
-        createError,
-        createReportStrategy,
-        createHandleStrategy
-    };
-    // if (typeof window !== 'undefined') {
-    //   Object.assign(api, { cleanStack, prepareError, config });
-    // }
     if (typeof window !== 'undefined') {
-        // const coreApi = init();
-        // const {
-        //   cleanStack,
-        //   prepareError,
-        //   config,
-        //   ...browserApi
-        // } = coreApi as CoreApi;
-        // Madcap = browserApi;
-        // Madcap = browserApi.configure;
-        // Object.assign(Madcap, browserApi);
         window.onerror = (msg, url, line, col, error) => {
             if (error && !error.attempts) {
                 error.isHandled = true;
@@ -243,7 +180,18 @@ function Madcap(initConfig) {
                 .then(config.handle.bind(null, error));
         });
     }
-    return api;
+    // Public Madcap strategy API
+    return {
+        attempt,
+        configure
+    };
 }
-export default Madcap;
+const reporters = {
+    consoleReporter
+};
+const handlers = {
+    retryThenRecover
+};
+const errors = {};
+export { Madcap as default, createError, createReportStrategy, createHandleStrategy, reporters, handlers };
 //# sourceMappingURL=index.js.map

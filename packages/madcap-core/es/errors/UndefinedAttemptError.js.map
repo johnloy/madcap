@@ -1,0 +1,1 @@
+{"version":3,"file":"UndefinedAttemptError.js","sourceRoot":"","sources":["../../src/errors/UndefinedAttemptError.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,WAAW,EAAe,MAAM,oBAAoB,CAAC;AAE9D,MAAM,CAAC,MAAM,qBAAqB,GAAG,WAAW,CAC9C,sBAAsB,EACtB,KAAK,EACL;IACE,WAAW,EAAE,EAAE;IACf,OAAO,EAAE,CAAC,CAAc,EAAE,EAAE;QAC1B,MAAM,CAAC,YAAY,CAAC,CAAC,WAAW,yCAAyC,CAAC;IAC5E,CAAC;CACF,CACF,CAAC"}

@@ -1,23 +1,24 @@
 import * as StackTrace from 'stacktrace-js';
 import { MadcapError, createError } from './lib/createError';
-import { reportToConsole } from './reporters/console';
+import { consoleReporter } from './reporters';
+import { retryThenRecover } from './handlers';
+import { UndefinedAttemptError } from './errors/UndefinedAttemptError';
+import {
+  StrategyMap,
+  isStrategyMap,
+  createReportStrategy,
+  createHandleStrategy,
+  ErrorHandler,
+  Strategy
+} from './lib/strategy';
 
-export interface BrowserApi {
+export interface MadcapApi {
   configure(newConfig: Partial<Config>): Config;
   attempt(
     name: AttemptName,
     fn: AttemptFunction,
     pastAttempts?: Attempt[]
   ): Promise<any>;
-}
-
-export interface CoreApi extends BrowserApi {
-  core?: CoreApi | BrowserApi;
-  prepareError(
-    error: MadcapError,
-    stackFrames?: StackTrace.StackFrame[]
-  ): MadcapError;
-
   cleanStack(
     stackFrame: StackTrace.StackFrame,
     index?: number,
@@ -66,41 +67,43 @@ export interface AttemptFunction {
 }
 
 export interface Config {
-  report: (error: MadcapError) => void | StrategyMap;
-  handle: (error: MadcapError) => void | StrategyMap;
+  report: ErrorHandler | Strategy;
+  handle: ErrorHandler | Strategy;
   allowUndefinedAttempts?: boolean;
   stackTraceLimit?: number;
 }
 
 export type AttemptsMap = Map<AttemptFunction, Attempt[]>;
 
-export type StrategyMap =
-  | Map<Partial<MadcapError>, ErrorHandler>
-  | [[Partial<MadcapError>, ErrorHandler]];
-
-export interface ErrorHandler {
-  (error: Error): void;
-}
-
-export interface Strategy extends ErrorHandler {
-  __default__?: ErrorHandler;
-  add?: (constr: Error, strategy: ErrorHandler) => void;
-  remove?: (constr: Error, strategy: ErrorHandler) => void;
-  setDefault?: (strategy: ErrorHandler) => ErrorHandler;
-}
-
-const UndefinedAttemptError = createError('UndefinedAttempError', Error, {
-  attemptName: '',
-  message: (e: MadcapError) => {
-    return `Attempt "${e.attemptName}" failed because undefined was returned`;
-  }
-});
-
 function warnToConfigureHandle(): void {
   console.warn('You need to configure a handler');
 }
 
-function Madcap(initConfig: Config): CoreApi | Partial<CoreApi> {
+function isAttemptFunction(a: any): a is AttemptFunction {
+  return typeof a === 'function';
+}
+
+function cleanStack(
+  stackFrame: StackTrace.StackFrame,
+  index?: number,
+  stackFrames?: StackTrace.StackFrame[],
+  removeFirst?: boolean
+): boolean {
+  const isAttemptFn =
+    stackFrame.functionName && stackFrame.functionName.endsWith('attempt');
+  if (removeFirst) {
+    return index !== 0 && !isAttemptFn;
+  }
+  return index === 0 || !isAttemptFn;
+}
+
+const cleanAttemptStack = (
+  stackFrame: StackTrace.StackFrame,
+  index?: number,
+  stackFrames?: StackTrace.StackFrame[]
+) => cleanStack(stackFrame, index, stackFrames, true);
+
+function Madcap(initConfig: Config): MadcapApi | Partial<MadcapApi> {
   /*
    * A Map instance with shape Map<AttemptFunction, Attempt[]>, held in the
    * Madcap function closure, that stores attempt data. This data supplies
@@ -109,17 +112,13 @@ function Madcap(initConfig: Config): CoreApi | Partial<CoreApi> {
   const attemptsMap: AttemptsMap = new Map();
 
   const config: Config = {
-    report: reportToConsole,
+    report: consoleReporter,
     handle: warnToConfigureHandle,
     allowUndefinedAttempts: false
   };
 
   if (typeof initConfig === 'object') {
     configure(initConfig);
-  }
-
-  function isStrategyMap(strategy: any): strategy is StrategyMap {
-    return strategy && (Array.isArray(strategy) || strategy instanceof Map);
   }
 
   function configure(mergeConfig: Partial<Config>): Config {
@@ -190,31 +189,8 @@ function Madcap(initConfig: Config): CoreApi | Partial<CoreApi> {
     error.fileName = topFrame.fileName;
     error.lineNumber = topFrame.lineNumber;
     error.columnNumber = topFrame.columnNumber;
+    error.attempts = attempts;
     return error;
-  }
-
-  function cleanStack(
-    stackFrame: StackTrace.StackFrame,
-    index?: number,
-    stackFrames?: StackTrace.StackFrame[],
-    removeFirst?: boolean
-  ): boolean {
-    const isAttemptFn =
-      stackFrame.functionName && stackFrame.functionName.endsWith('attempt');
-    if (removeFirst) {
-      return index !== 0 && !isAttemptFn;
-    }
-    return index === 0 || !isAttemptFn;
-  }
-
-  const cleanAttemptStack = (
-    stackFrame: StackTrace.StackFrame,
-    index?: number,
-    stackFrames?: StackTrace.StackFrame[]
-  ) => cleanStack(stackFrame, index, stackFrames, true);
-
-  function isAttemptFunction(a: any): a is AttemptFunction {
-    return typeof a === 'function';
   }
 
   /**
@@ -311,6 +287,7 @@ function Madcap(initConfig: Config): CoreApi | Partial<CoreApi> {
         if (!config.allowUndefinedAttempts) {
           throw new UndefinedAttemptError({ attemptName: name });
         }
+        // Just nag instead. No throwing nonsense.
         console.warn(
           `Attempt ${name} returns undefined. Is it a work in progress?`
         );
@@ -321,78 +298,7 @@ function Madcap(initConfig: Config): CoreApi | Partial<CoreApi> {
     }
   }
 
-  function retryThenRecover(
-    error: Error | MadcapError /*, retry, retryTimes, recover*/
-  ) {
-    console.log(error);
-    // if (error.retry && error.retriedCount) {
-    // }
-  }
-
-  function createStrategy(strategyDef: StrategyMap): Strategy {
-    const strategyMap = new Map(strategyDef);
-    const strategy: Strategy = (error: Error): void => {
-      let resolvedStrategy;
-      const match = Array.from(strategyMap.keys()).find(
-        (constr: Function) => error instanceof constr
-      );
-      if (match) {
-        resolvedStrategy = strategyMap.get(match);
-      } else {
-        if (!strategy.__default__) return;
-        resolvedStrategy = strategy.__default__;
-      }
-      resolvedStrategy!(error);
-    };
-
-    strategy.add = (constr: Error, handler: ErrorHandler) =>
-      strategyMap.set(constr, handler);
-    strategy.remove = (constr: Error, handler: ErrorHandler) =>
-      strategyMap.delete(constr);
-    strategy.setDefault = (handler: ErrorHandler): ErrorHandler => {
-      strategy.__default__ = handler;
-      return handler;
-    };
-
-    return strategy;
-  }
-
-  function createReportStrategy(strategyDef: StrategyMap): Strategy {
-    const strategy = createStrategy(strategyDef);
-    strategy.setDefault!(reportToConsole);
-    return strategy;
-  }
-
-  function createHandleStrategy(strategyDef: StrategyMap): Strategy {
-    const strategy = createStrategy(strategyDef);
-    strategy.setDefault!(retryThenRecover);
-    return strategy;
-  }
-
-  const api = {
-    attempt,
-    configure,
-    createError,
-    createReportStrategy,
-    createHandleStrategy
-  };
-  // if (typeof window !== 'undefined') {
-  //   Object.assign(api, { cleanStack, prepareError, config });
-  // }
-
   if (typeof window !== 'undefined') {
-    // const coreApi = init();
-    // const {
-    //   cleanStack,
-    //   prepareError,
-    //   config,
-    //   ...browserApi
-    // } = coreApi as CoreApi;
-
-    // Madcap = browserApi;
-    // Madcap = browserApi.configure;
-    // Object.assign(Madcap, browserApi);
-
     window.onerror = (msg, url, line, col, error: MadcapError) => {
       if (error && !error.attempts) {
         error.isHandled = true;
@@ -419,7 +325,28 @@ function Madcap(initConfig: Config): CoreApi | Partial<CoreApi> {
     );
   }
 
-  return api;
+  // Public Madcap strategy API
+  return {
+    attempt,
+    configure
+  };
 }
 
-export default Madcap;
+const reporters = {
+  consoleReporter
+};
+
+const handlers = {
+  retryThenRecover
+};
+
+const errors = {};
+
+export {
+  Madcap as default,
+  createError,
+  createReportStrategy,
+  createHandleStrategy,
+  reporters,
+  handlers
+};
