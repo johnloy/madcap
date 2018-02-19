@@ -117,14 +117,14 @@ function bootstrap(attempt) {
     });
   }
 
-  attempt('async bootstrap step', async attempt => {
+  return attempt('async bootstrap step', async attempt => {
     if (demoNumber === 3) {
       throw new DemoError({
         order: 3,
         where: 'in subattempt callback function (async)'
       });
     }
-    await doSomethingAsync(attempt)
+    return doSomethingAsync(attempt)
       .then(
         () => {
           if (demoNumber === 11) {
@@ -133,6 +133,7 @@ function bootstrap(attempt) {
               where: 'error in a Promise then'
             });
           }
+          return ReactDOM.render(<App />, document.getElementById('root'));
         },
         error => {
           if (demoNumber === 12) {
@@ -155,7 +156,6 @@ function bootstrap(attempt) {
       });
   });
 
-  return ReactDOM.render(<App />, document.getElementById('root'));
 }
 
 if (demoNumber === 1) {
@@ -164,6 +164,7 @@ if (demoNumber === 1) {
     where: 'before bootstrap'
   });
 }
+
 
 attempt('bootstrap', bootstrap);
 

@@ -7,6 +7,7 @@ import { inherits } from 'util';
 const glob = require('glob-promise');
 
 const shouldBuildEsModules = process.argv[2] === 'es';
+const shouldWatch = process.argv.slice(2).includes('-w');
 
 function spawnCompilation(packagePath: string) {
   return new Promise(async (resolve, reject) => {
@@ -14,8 +15,12 @@ function spawnCompilation(packagePath: string) {
       path.join(packagePath, PACKAGE_DIRS.src) + '/**/*.ts'
     );
     let tscOptions: any[] = [];
+    if (shouldWatch) {
+      tscOptions.push('-w');
+    }
     if (shouldBuildEsModules) {
       tscOptions = tscOptions.concat(
+        ...tscOptions,
         '-m',
         'es2015',
         '-t',

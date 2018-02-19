@@ -18,6 +18,7 @@ function warnToConfigureHandle() {
 function isAttemptFunction(a) {
     return typeof a === 'function';
 }
+// sdfsdf
 function cleanStack(stackFrame, index, stackFrames, removeFirst) {
     const isAttemptFn = stackFrame.functionName && stackFrame.functionName.endsWith('attempt');
     if (removeFirst) {
@@ -88,7 +89,15 @@ function Madcap(initConfig) {
         error.fileName = topFrame.fileName;
         error.lineNumber = topFrame.lineNumber;
         error.columnNumber = topFrame.columnNumber;
+        error.attempts = attempts;
         return error;
+    }
+    function getAttemptLocation(stackFrames) {
+        // const revStackFrames = stackFrames.slice(0).reverse();
+        const attemptFrame = stackFrames.find(stackFrame => !stackFrame.fileName.includes('madcap-core'));
+        if (attemptFrame) {
+            return `${attemptFrame.fileName}:${attemptFrame.lineNumber}:${attemptFrame.columnNumber}`;
+        }
     }
     function attempt(name, contextOrFn, fnOrPastAttempts, pastAttempts) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -102,18 +111,15 @@ function Madcap(initConfig) {
                 fn = contextOrFn;
                 pastAttempts = fnOrPastAttempts;
             }
-            const stackFrames = yield StackTrace.fromError(new Error(), {
-                filter: cleanAttemptStack
-            });
+            const stackFrames = yield StackTrace.get();
             let attempts = pastAttempts || attemptsMap.get(fn) || [];
+            const location = getAttemptLocation(stackFrames);
             if (!attempts.length) {
-                attempts = [{ name, function: fn, stackFrames, context }];
+                attempts = [{ name, function: fn, stackFrames, context, location }];
                 attemptsMap.set(fn, attempts);
                 const ret = attempt(name, fn).catch((error) => __awaiter(this, void 0, void 0, function* () {
                     if (!error.trace) {
-                        error.trace = yield StackTrace.fromError(error, {
-                            filter: cleanStack
-                        });
+                        error.trace = yield StackTrace.fromError(error);
                         const newStackFrames = attempts
                             .reverse()
                             .map((attempt) => attempt.stackFrames)
@@ -136,32 +142,31 @@ function Madcap(initConfig) {
                 return ret;
             }
             if (fn !== attempts[0].function) {
-                attempts.push({ name, function: fn, stackFrames, context });
+                attempts.push({ name, function: fn, stackFrames, context, location });
             }
             function subattempt(name, fn) {
                 return attempt(name, fn, attempts);
             }
-            try {
-                const ret = fn(subattempt);
-                if (ret === undefined) {
-                    if (!config.allowUndefinedAttempts) {
-                        throw new UndefinedAttemptError({ attemptName: name });
-                    }
-                    // Just nag instead. No throwing nonsense.
-                    console.warn(`Attempt ${name} returns undefined. Is it a work in progress?`);
+            // try {
+            const ret = fn(subattempt);
+            if (ret === undefined) {
+                if (!config.allowUndefinedAttempts) {
+                    throw new UndefinedAttemptError({ attemptName: name });
                 }
-                return ret;
+                // Just nag instead. No throwing nonsense.
+                console.warn(`Attempt ${name} returns undefined. Is it a work in progress?`);
             }
-            catch (error) {
-                return Promise.reject(error);
-            }
+            return ret;
+            // } catch (error) {
+            //   return Promise.reject(error);
+            // }
         });
     }
     if (typeof window !== 'undefined') {
         window.onerror = (msg, url, line, col, error) => {
             if (error && !error.attempts) {
                 error.isHandled = true;
-                StackTrace.fromError(error, { filter: cleanStack })
+                StackTrace.fromError(error)
                     .then(prepareError.bind(null, error))
                     .then(config.report.bind(null, error))
                     .then(config.handle.bind(null, error));
@@ -174,7 +179,7 @@ function Madcap(initConfig) {
             const error = e.reason;
             if (error.isHandled)
                 return;
-            StackTrace.fromError(error, { filter: cleanStack })
+            StackTrace.fromError(error)
                 .then(prepareError.bind(null, error))
                 .then(config.report.bind(null, error))
                 .then(config.handle.bind(null, error));

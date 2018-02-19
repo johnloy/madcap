@@ -1,11 +1,12 @@
 import { MadcapError } from '../lib/createError';
+import { Attempt as AttemptType } from '../index';
 
 declare var __DEBUG__: boolean;
 
 class Attempt {
-  location: string;
-  constructor(fn: Function) {
-    this.location = '';
+  location: string | void;
+  constructor(attempt: AttemptType) {
+    this.location = attempt.location;
   }
 }
 
@@ -14,14 +15,16 @@ export function consoleReporter(error: MadcapError): MadcapError | void {
     console.group('%c%s', 'color: red', error.message);
     console.error(error);
     console.log(
-      `Location: ${error.fileName}:${error.lineNumber}:${error.columnNumber}\n`
+      `Location: ${location.origin}${error.fileName}:${error.lineNumber}:${
+        error.columnNumber
+      }\n`
     );
     if (error.attempts) {
       const attemptsReportStr: string = error.attempts.reduce(
         (report, attempt, index): string => {
           report += '%d)    Name: %s\n';
           report += '   Context: %O\n';
-          report += `  Function: %O\n`;
+          report += `  Location: %s\n`;
           report += '\n';
           return report;
         },
@@ -32,7 +35,7 @@ export function consoleReporter(error: MadcapError): MadcapError | void {
           report.push(index + 1);
           report.push(attempt.name);
           report.push(attempt.context || 'none provided');
-          report.push(new Attempt(attempt.function));
+          report.push(location.origin + attempt.location);
           return report;
         },
         []

@@ -7,12 +7,8 @@
   "license": "MIT",
   "private": false,
   "scripts": {
-    "start": "run-p clean:es5 clean:es && run-p 'build:* -w'",
-    "clean": "run-p clean:*",
-    "clean:es5": "shx rm -rf lib",
-    "clean:es": "shx rm -rf es",
-    "clean:umd": "shx rm -rf dist",
-    "build": "run-s build:*",
+    "start": "run-p 'build -w'",
+    "build": "run-p 'build:* {1}' --",
     "build:es5": "ts-node ./tasks/compile",
     "build:es": "ts-node ./tasks/compile es",
     "build:umd": "webpack",
@@ -43,7 +39,7 @@
     "tabWidth": 2
   },
   "lint-staged": {
-    "src/**/*.{ts,js}": [
+    "packages/**/src/**/*.{ts,js}": [
       "prettier --write",
       "tslint",
       "git add"

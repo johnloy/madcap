@@ -1398,8 +1398,8 @@ exports.createError = createError;
 
 Object.defineProperty(exports, "__esModule", { value: true });
 var Attempt = /** @class */ (function () {
-    function Attempt(fn) {
-        this.location = '';
+    function Attempt(attempt) {
+        this.location = attempt.location;
     }
     return Attempt;
 }());
@@ -1407,12 +1407,12 @@ function consoleReporter(error) {
     if (__DEBUG__) {
         console.group('%c%s', 'color: red', error.message);
         console.error(error);
-        console.log("Location: " + error.fileName + ":" + error.lineNumber + ":" + error.columnNumber + "\n");
+        console.log("Location: " + location.origin + error.fileName + ":" + error.lineNumber + ":" + error.columnNumber + "\n");
         if (error.attempts) {
             var attemptsReportStr = error.attempts.reduce(function (report, attempt, index) {
                 report += '%d)    Name: %s\n';
                 report += '   Context: %O\n';
-                report += "  Function: %O\n";
+                report += "  Location: %s\n";
                 report += '\n';
                 return report;
             }, '');
@@ -1420,7 +1420,7 @@ function consoleReporter(error) {
                 report.push(index + 1);
                 report.push(attempt.name);
                 report.push(attempt.context || 'none provided');
-                report.push(new Attempt(attempt.function));
+                report.push(location.origin + attempt.location);
                 return report;
             }, []);
             console.log.apply(console, ["Attempts:\n\n" + attemptsReportStr].concat(attemptsReportLogValues));
@@ -1503,6 +1503,7 @@ function warnToConfigureHandle() {
 function isAttemptFunction(a) {
     return typeof a === 'function';
 }
+// sdfsdf
 function cleanStack(stackFrame, index, stackFrames, removeFirst) {
     var isAttemptFn = stackFrame.functionName && stackFrame.functionName.endsWith('attempt');
     if (removeFirst) {
@@ -1572,7 +1573,15 @@ function Madcap(initConfig) {
         error.fileName = topFrame.fileName;
         error.lineNumber = topFrame.lineNumber;
         error.columnNumber = topFrame.columnNumber;
+        error.attempts = attempts;
         return error;
+    }
+    function getAttemptLocation(stackFrames) {
+        // const revStackFrames = stackFrames.slice(0).reverse();
+        var attemptFrame = stackFrames.find(function (stackFrame) { return !stackFrame.fileName.includes('madcap-core'); });
+        if (attemptFrame) {
+            return attemptFrame.fileName + ":" + attemptFrame.lineNumber + ":" + attemptFrame.columnNumber;
+        }
     }
     function attempt(name, contextOrFn, fnOrPastAttempts, pastAttempts) {
         return __awaiter(this, void 0, void 0, function () {
@@ -1580,7 +1589,7 @@ function Madcap(initConfig) {
             function subattempt(name, fn) {
                 return attempt(name, fn, attempts);
             }
-            var context, fn, stackFrames, attempts, ret, ret;
+            var context, fn, stackFrames, attempts, location, ret_1, ret;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -1592,25 +1601,22 @@ function Madcap(initConfig) {
                             fn = contextOrFn;
                             pastAttempts = fnOrPastAttempts;
                         }
-                        return [4 /*yield*/, StackTrace.fromError(new Error(), {
-                                filter: cleanAttemptStack
-                            })];
+                        return [4 /*yield*/, StackTrace.get()];
                     case 1:
                         stackFrames = _a.sent();
                         attempts = pastAttempts || attemptsMap.get(fn) || [];
+                        location = getAttemptLocation(stackFrames);
                         if (!attempts.length) {
-                            attempts = [{ name: name, function: fn, stackFrames: stackFrames, context: context }];
+                            attempts = [{ name: name, function: fn, stackFrames: stackFrames, context: context, location: location }];
                             attemptsMap.set(fn, attempts);
-                            ret = attempt(name, fn).catch(function (error) { return __awaiter(_this, void 0, void 0, function () {
+                            ret_1 = attempt(name, fn).catch(function (error) { return __awaiter(_this, void 0, void 0, function () {
                                 var _a, newStackFrames, errorEvent;
                                 return __generator(this, function (_b) {
                                     switch (_b.label) {
                                         case 0:
                                             if (!!error.trace) return [3 /*break*/, 2];
                                             _a = error;
-                                            return [4 /*yield*/, StackTrace.fromError(error, {
-                                                    filter: cleanStack
-                                                })];
+                                            return [4 /*yield*/, StackTrace.fromError(error)];
                                         case 1:
                                             _a.trace = _b.sent();
                                             newStackFrames = attempts
@@ -1635,26 +1641,20 @@ function Madcap(initConfig) {
                                     }
                                 });
                             }); });
-                            return [2 /*return*/, ret];
+                            return [2 /*return*/, ret_1];
                         }
                         if (fn !== attempts[0].function) {
-                            attempts.push({ name: name, function: fn, stackFrames: stackFrames, context: context });
+                            attempts.push({ name: name, function: fn, stackFrames: stackFrames, context: context, location: location });
                         }
-                        try {
-                            ret = fn(subattempt);
-                            if (ret === undefined) {
-                                if (!config.allowUndefinedAttempts) {
-                                    throw new UndefinedAttemptError_1.UndefinedAttemptError({ attemptName: name });
-                                }
-                                // Just nag instead. No throwing nonsense.
-                                console.warn("Attempt " + name + " returns undefined. Is it a work in progress?");
+                        ret = fn(subattempt);
+                        if (ret === undefined) {
+                            if (!config.allowUndefinedAttempts) {
+                                throw new UndefinedAttemptError_1.UndefinedAttemptError({ attemptName: name });
                             }
-                            return [2 /*return*/, ret];
+                            // Just nag instead. No throwing nonsense.
+                            console.warn("Attempt " + name + " returns undefined. Is it a work in progress?");
                         }
-                        catch (error) {
-                            return [2 /*return*/, Promise.reject(error)];
-                        }
-                        return [2 /*return*/];
+                        return [2 /*return*/, ret];
                 }
             });
         });
@@ -1663,7 +1663,7 @@ function Madcap(initConfig) {
         window.onerror = function (msg, url, line, col, error) {
             if (error && !error.attempts) {
                 error.isHandled = true;
-                StackTrace.fromError(error, { filter: cleanStack })
+                StackTrace.fromError(error)
                     .then(prepareError.bind(null, error))
                     .then(config.report.bind(null, error))
                     .then(config.handle.bind(null, error));
@@ -1676,7 +1676,7 @@ function Madcap(initConfig) {
             var error = e.reason;
             if (error.isHandled)
                 return;
-            StackTrace.fromError(error, { filter: cleanStack })
+            StackTrace.fromError(error)
                 .then(prepareError.bind(null, error))
                 .then(config.report.bind(null, error))
                 .then(config.handle.bind(null, error));
