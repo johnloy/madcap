@@ -10,7 +10,7 @@ const { attempt } = Madcap({
   report: reporters.consoleReporter,
   // report: reporters.reactErrorOverlay,
   handle: error => {
-    debugger;
+    // debugger;
   }
   // eventEmitters: [DOM]
   // mixins: {
@@ -19,6 +19,27 @@ const { attempt } = Madcap({
   //   setInterval
   // }
 });
+
+/*
+
+function* foo {
+  try {
+    const result yield 
+
+  } catch(e) {
+
+  }
+}
+
+const readLines = attempt(function*() {
+
+});
+
+GeneratorError
+.attemptName
+.values
+
+*/
 
 const DemoError = createError('DemoError', Error, {
   message: ({ order, where }) => `(${order}) ${where}`,

@@ -35,7 +35,7 @@ window.__DEBUG__ = window.__DEVELOPMENT__ || window.__STAGING__;
 const demoNumberMatch = window.location.search.match(/demo=(\d+)/);
 const demoNumber = demoNumberMatch ? parseInt(demoNumberMatch[1], 10) : null;
 
-function doSomethingAsync(attempt) {
+function doSomethingAsync() {
   if (demoNumber === 4) {
     throw new DemoError({
       order: 4,
@@ -105,7 +105,7 @@ function doSomethingAsync(attempt) {
   return Promise.all([concurrentAttempt1, concurrentAttempt2]);
 }
 
-function bootstrap(attempt) {
+function bootstrap() {
   const state = {
     isBoostrapped: false
   };
@@ -117,33 +117,33 @@ function bootstrap(attempt) {
     });
   }
 
-  return attempt('async bootstrap step', async attempt => {
+  return attempt('async bootstrap step', async () => {
     if (demoNumber === 3) {
       throw new DemoError({
         order: 3,
         where: 'in subattempt callback function (async)'
       });
     }
-    return doSomethingAsync(attempt)
+    return doSomethingAsync()
       .then(
-        () => {
-          if (demoNumber === 11) {
-            throw new DemoError({
-              order: 11,
-              where: 'error in a Promise then'
-            });
-          }
-          return ReactDOM.render(<App />, document.getElementById('root'));
-        },
-        error => {
-          if (demoNumber === 12) {
-            throw new DemoError({
-              order: 12,
-              where: 'error in a Promise then error callback'
-            });
-          }
-          throw error;
+      () => {
+        if (demoNumber === 11) {
+          throw new DemoError({
+            order: 11,
+            where: 'error in a Promise then'
+          });
         }
+        return ReactDOM.render(<App />, document.getElementById('root'));
+      },
+      error => {
+        if (demoNumber === 12) {
+          throw new DemoError({
+            order: 12,
+            where: 'error in a Promise then error callback'
+          });
+        }
+        throw error;
+      }
       )
       .catch(error => {
         if (demoNumber === 13) {
